@@ -11,6 +11,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed=UNSLOTH_NATIVE_PAYLOAD_DIR");
 
     let repo = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    if env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows") {
+        embed_windows_icon(&repo);
+    }
     let manifest = repo.join("native-ui/portable-files.txt");
     let native_helper = repo.join("scripts/build-native.ps1");
     println!("cargo:rerun-if-changed={}", manifest.display());
@@ -72,6 +75,61 @@ fn main() {
         encoded.extend_from_slice(&bytes);
     }
     fs::write(out.join("native_payload.bin"), encoded).expect("write embedded payload");
+}
+
+fn embed_windows_icon(repo: &Path) {
+    let resource = repo.join("assets/unsloth-launcher/icon.rc");
+    let icon = repo.join("assets/unsloth-launcher/icon.ico");
+    println!("cargo:rerun-if-changed={}", resource.display());
+    println!("cargo:rerun-if-changed={}", icon.display());
+
+    let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
+    let compiled_resource = out.join("unsloth-launcher-icon.res");
+    let compiler = find_resource_compiler();
+    let status = Command::new(&compiler)
+        .arg("/nologo")
+        .arg(format!("/fo{}", compiled_resource.display()))
+        .arg("icon.rc")
+        .current_dir(resource.parent().expect("icon resource directory"))
+        .status()
+        .unwrap_or_else(|error| panic!("could not start Windows resource compiler: {error}"));
+    if !status.success() {
+        panic!("Windows resource compiler failed to embed the launcher icon");
+    }
+    println!("cargo:rustc-link-arg={}", compiled_resource.display());
+}
+
+fn find_resource_compiler() -> PathBuf {
+    if let Some(path) = env::var_os("RC") {
+        return PathBuf::from(path);
+    }
+    if Command::new("rc.exe").arg("/?").output().is_ok() {
+        return PathBuf::from("rc.exe");
+    }
+
+    let mut roots = Vec::new();
+    if let Some(root) = env::var_os("WindowsSdkDir") {
+        roots.push(PathBuf::from(root).join("bin"));
+    }
+    roots.push(PathBuf::from(r"C:\Program Files (x86)\Windows Kits\10\bin"));
+    for root in roots {
+        let Ok(versions) = fs::read_dir(root) else {
+            continue;
+        };
+        let mut versions: Vec<_> = versions
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect();
+        versions.sort();
+        versions.reverse();
+        for version in versions {
+            let candidate = version.join("x64/rc.exe");
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+    }
+    panic!("Windows SDK resource compiler rc.exe was not found");
 }
 
 fn prepare_native_ui(repo: &Path, helper: &Path) {

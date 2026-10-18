@@ -1,18 +1,36 @@
 #pragma once
 
 #include "MainWindow.g.h"
+#include <winrt/Microsoft.UI.Windowing.h>
 
 namespace winrt::StudioUI::implementation {
 
 struct MainWindow : MainWindowT<MainWindow> {
   MainWindow();
-  void GeneralClicked(IInspectable const &, Microsoft::UI::Xaml::RoutedEventArgs const &);
-  void UpdateClicked(IInspectable const &, Microsoft::UI::Xaml::RoutedEventArgs const &);
-  void ExperimentalClicked(IInspectable const &, Microsoft::UI::Xaml::RoutedEventArgs const &);
-  void AboutClicked(IInspectable const &, Microsoft::UI::Xaml::RoutedEventArgs const &);
+  ~MainWindow();
+
+  void OnNavigationChanged(
+      Microsoft::UI::Xaml::Controls::NavigationView const &,
+      Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const &);
+  void DeveloperOffClicked(IInspectable const &,
+                           Microsoft::UI::Xaml::RoutedEventArgs const &);
+  void DeveloperResetClicked(IInspectable const &,
+                             Microsoft::UI::Xaml::RoutedEventArgs const &);
 
 private:
-  void ShowPage(Microsoft::UI::Xaml::Controls::StackPanel const &page);
+  void UpdateTitleBarLayout();
+  void ShowPage(std::wstring const &page);
+  void OpenDeveloperPanel();
+
+  Microsoft::UI::Windowing::AppWindow appWindow_{nullptr};
+  Microsoft::UI::Xaml::XamlRoot xamlRoot_{nullptr};
+  Microsoft::UI::Xaml::Controls::NavigationViewItem developerNavigationItem_{nullptr};
+  winrt::event_token appWindowChangedToken_{};
+  winrt::event_token navigationLoadedToken_{};
+  winrt::event_token xamlRootChangedToken_{};
+  std::wstring developerReturnPage_{L"General"};
+  HWND hwnd_{};
+  bool developerPanelActive_{false};
 };
 
 } // namespace winrt::StudioUI::implementation

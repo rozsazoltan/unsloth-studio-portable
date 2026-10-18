@@ -3,38 +3,126 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Unsloth Studio Desktop">
-    <Grid Background="#FF151916">
-        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
-                Padding="10,0" MinWidth="40" MinHeight="40"
-                AutomationProperties.Name="More options">
-            <Button.Content>…</Button.Content>
-            <Button.Flyout>
-                <MenuFlyout>
-                    <MenuFlyoutItem Text="General" Click="GeneralClicked" />
-                    <MenuFlyoutItem Text="Update" Click="UpdateClicked" />
-                    <MenuFlyoutItem Text="Experimental" Click="ExperimentalClicked" />
-                    <MenuFlyoutItem Text="About" Click="AboutClicked" />
-                </MenuFlyout>
-            </Button.Flyout>
-        </Button>
-        <StackPanel x:Name="GeneralPage" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
-            <TextBlock Text="General" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
-            <TextBlock Text="Minimal native desktop shell" Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="Studio management is not available yet." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-        </StackPanel>
-        <StackPanel x:Name="UpdatePage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
-            <TextBlock Text="Update" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
-            <TextBlock Text="Update management is not available in this minimal shell." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-        </StackPanel>
-        <StackPanel x:Name="ExperimentalPage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
-            <TextBlock Text="Experimental" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
-            <TextBlock Text="No experimental features are enabled." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-        </StackPanel>
-        <StackPanel x:Name="AboutPage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
-            <TextBlock Text="Unsloth Studio Desktop" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="A minimal native Windows shell for Unsloth Studio." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="License: AGPL-3.0-or-later" Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="Acknowledgments: Unsloth, mise, and quota-usage-monitor." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-        </StackPanel>
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition x:Name="TitleBarRow" Height="32" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="TitleBarDragRegion" Grid.Row="0" Background="Transparent"
+              AutomationProperties.Name="Window drag area"
+              AutomationProperties.AutomationId="SettingsTitleBarDragRegion" />
+        <NavigationView x:Name="Navigation" Grid.Row="0" Grid.RowSpan="2"
+                        PaneDisplayMode="Left" CompactPaneLength="48" OpenPaneLength="244"
+                        IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
+                        IsPaneToggleButtonVisible="True" Background="Transparent"
+                        SelectionChanged="OnNavigationChanged">
+            <NavigationView.PaneHeader>
+                <StackPanel Margin="18,18,12,24" Spacing="5">
+                    <TextBlock Text="UNSLOTH STUDIO" FontSize="11" FontWeight="SemiBold"
+                               CharacterSpacing="150" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" />
+                </StackPanel>
+            </NavigationView.PaneHeader>
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="NavigationGeneralItem" Content="General" Tag="General" Icon="Setting" />
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="NavigationUpdateItem" Content="Update" Tag="Update" Icon="Download" />
+                <NavigationViewItem x:Name="NavigationExperimentalItem" Content="Experimental" Tag="Experimental" Icon="Important" />
+                <NavigationViewItem x:Name="NavigationAboutItem" Content="About" Tag="About" Icon="Help" />
+            </NavigationView.FooterMenuItems>
+            <Grid x:Name="PageContent">
+                <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Padding="40,30,40,40" Spacing="22">
+                        <StackPanel Spacing="5">
+                            <TextBlock x:Name="PageEyebrow" Text="PREFERENCES" FontSize="11"
+                                       FontWeight="SemiBold" CharacterSpacing="130"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="PageTitle" Text="General" FontSize="32" FontWeight="SemiBold" />
+                            <TextBlock x:Name="PageSummary" Text="Unsloth Studio Desktop settings."
+                                       FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel x:Name="PageHost" Spacing="18">
+                            <StackPanel x:Name="GeneralPage" Spacing="12">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="18">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Studio management is not available yet." FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="This window is a minimal native shell. It does not install, update, or launch Studio."
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="UpdatePage" Visibility="Collapsed" Spacing="12">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="18">
+                                    <TextBlock Text="Updates are not available in this minimal shell."
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="ExperimentalPage" Visibility="Collapsed" />
+                            <StackPanel x:Name="AboutPage" Visibility="Collapsed" Spacing="16">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="20">
+                                    <StackPanel Spacing="18">
+                                        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                            <Image x:Name="AboutLogo" Source="icon-256.png" Width="60" Height="60"
+                                                   Stretch="Uniform" AutomationProperties.Name="Unsloth Studio Desktop icon" />
+                                            <StackPanel VerticalAlignment="Center" Spacing="3">
+                                                <TextBlock Text="Unsloth Studio Desktop" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="A native Windows shell for Unsloth Studio."
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Border Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1" CornerRadius="8" Padding="16,13">
+                                            <TextBlock Text="Studio management features are deferred. This shell does not bundle Unsloth Studio, mise, or uv."
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </Border>
+                                        <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Project &amp; licensing" FontSize="16" FontWeight="SemiBold" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                                <HyperlinkButton Content="View project source"
+                                                                 NavigateUri="https://github.com/rozsazoltan/unsloth-studio-portable" />
+                                                <HyperlinkButton Content="AGPL-3.0-or-later"
+                                                                 NavigateUri="https://github.com/rozsazoltan/unsloth-studio-portable/blob/main/LICENSE" />
+                                            </StackPanel>
+                                            <TextBlock Text="Third-party components" FontSize="16" FontWeight="SemiBold" />
+                                            <TextBlock Text="This companion bundles Windows App SDK runtime files. The project uses C++/WinRT for native WinUI integration."
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <HyperlinkButton Content="Windows App SDK license (MIT)"
+                                                                 NavigateUri="https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE" />
+                                                <HyperlinkButton Content="C++/WinRT license (MIT)"
+                                                                 NavigateUri="https://github.com/microsoft/cppwinrt/blob/master/LICENSE" />
+                                            </StackPanel>
+                                            <TextBlock Text="Acknowledgments: Unsloth Studio, mise, and uv are planned manager dependencies; they are not included in this minimal shell."
+                                                       FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="DeveloperPage" Visibility="Collapsed" Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Off" Click="DeveloperOffClicked" />
+                                    <Button Content="Reset" Click="DeveloperResetClicked" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
     </Grid>
 </Window>

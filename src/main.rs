@@ -17,27 +17,17 @@ fn run() -> Result<()> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     match args.as_slice() {
         [arg] if arg == "--help" => {
-            println!("Unsloth Studio Desktop\n\nUsage: unsloth-studio-portable.exe [--help|--version|--tray]\n\nStart the native UI, or use --tray to begin in the notification area.");
+            println!("Unsloth Studio Desktop\n\nUsage: unsloth-studio-portable.exe [--help|--version]\n\nOpen the native window.");
             Ok(())
         }
         [arg] if arg == "--version" => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        [arg] if arg == "--tray" => {
-            #[cfg(windows)]
-            {
-                tray::run(true)
-            }
-            #[cfg(not(windows))]
-            {
-                bail!("This launcher supports Windows only")
-            }
-        }
         [] => {
             #[cfg(windows)]
             {
-                tray::run(false)
+                ipc::run_minimal_ui()
             }
             #[cfg(not(windows))]
             {

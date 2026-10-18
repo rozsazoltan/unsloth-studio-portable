@@ -85,6 +85,20 @@ pub fn launch_ui(state: SharedState, exit_requested: Arc<AtomicBool>) -> Result<
     Ok(child)
 }
 
+pub fn run_minimal_ui() -> Result<()> {
+    let exe = extract_payload()?;
+    let status = Command::new(exe)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .context("run WinUI companion")?;
+    if !status.success() {
+        bail!("WinUI companion exited with status {status}");
+    }
+    Ok(())
+}
+
 fn extract_payload() -> Result<PathBuf> {
     let bytes = include_bytes!(concat!(env!("OUT_DIR"), "/native_payload.bin"));
     let base = PathBuf::from(std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is missing")?)

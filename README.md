@@ -46,3 +46,6 @@ pwsh -NoProfile -File scripts/build-release.ps1
 Original launcher code: **AGPL-3.0-or-later**. You may redistribute and/or modify it under GNU AGPL version 3 or, at your option, any later version. Provided without warranty; see [LICENSE](LICENSE).
 
 Native packaging and interaction patterns are informed by [quota-usage-monitor](https://github.com/rozsazoltan/quota-usage-monitor). Thanks to [Unsloth](https://github.com/unslothai/unsloth), mise, uv, Microsoft WinUI and marcosnils/bin. Upstream software and bundled dependencies retain their own licenses; this launcher does not relicense Unsloth Studio.
+## Local development
+
+Run `cargo run` on Windows to build and open the minimal native WinUI 3 window. The starter window does not initialize deferred manager features.

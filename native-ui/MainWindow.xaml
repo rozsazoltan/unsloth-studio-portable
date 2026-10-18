@@ -1,0 +1,103 @@
+<Window
+    x:Class="StudioUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Unsloth Studio Desktop">
+    <Grid Background="#FF151916">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Padding="22,28" Spacing="18" Background="#FF1C211E">
+            <StackPanel Spacing="2">
+                <TextBlock Text="UNSLOTH" FontSize="13" FontWeight="Bold" CharacterSpacing="180" Foreground="#FFC7F36B" />
+                <TextBlock Text="Studio Desktop" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <NavigationView x:Name="Nav" IsPaneVisible="False" IsSettingsVisible="False" SelectionChanged="NavChanged" Background="Transparent">
+                <NavigationView.MenuItems>
+                    <NavigationViewItem Content="Overview" Tag="overview"><NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon></NavigationViewItem>
+                    <NavigationViewItem Content="Settings" Tag="settings"><NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon></NavigationViewItem>
+                    <NavigationViewItem Content="About" Tag="about"><NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon></NavigationViewItem>
+                    <NavigationViewItem Content="Experimental" Tag="experimental"><NavigationViewItem.Icon><SymbolIcon Symbol="Important" /></NavigationViewItem.Icon></NavigationViewItem>
+                </NavigationView.MenuItems>
+            </NavigationView>
+            <TextBlock x:Name="Connection" Text="Connecting to launcher…" TextWrapping="Wrap" FontSize="12" Foreground="#FFA6B0A8" VerticalAlignment="Bottom" />
+        </StackPanel>
+        <ScrollViewer Grid.Column="1">
+            <StackPanel Padding="38,32" Spacing="18">
+                <InfoBar x:Name="Banner" IsOpen="False" IsClosable="False" />
+                <StackPanel x:Name="Overview" Spacing="18">
+                    <StackPanel>
+                        <TextBlock Text="LOCAL AI, READY WHEN YOU ARE" FontSize="11" CharacterSpacing="160" Foreground="#FFC7F36B" />
+                        <TextBlock Text="Studio control room" FontSize="34" FontWeight="SemiBold" />
+                        <TextBlock x:Name="Phase" Text="Waiting for launcher state" Foreground="#FFA6B0A8" />
+                    </StackPanel>
+                    <Border Background="#FF202522" CornerRadius="12" Padding="22">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="UNSLOTH STUDIO" FontSize="12" CharacterSpacing="120" Foreground="#FFA6B0A8" />
+                                <TextBlock x:Name="InstallStatus" Text="Not connected" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock x:Name="Commit" Text="Launcher connection required" Foreground="#FFA6B0A8" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button x:Name="InstallButton" Content="Install" Click="InstallClicked" />
+                                <Button x:Name="UpdateButton" Content="Update" Click="UpdateClicked" />
+                                <Button x:Name="StartButton" Content="Start" Click="StartClicked" />
+                                <Button x:Name="StopButton" Content="Stop" Click="StopClicked" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="OpenButton" Content="Open Studio" Click="OpenClicked" />
+                        <Button x:Name="CheckButton" Content="Check for updates" Click="CheckClicked" />
+                        <Button x:Name="RemoveButton" Content="Remove…" Click="RemoveClicked" />
+                    </StackPanel>
+                    <Border Background="#FF202522" CornerRadius="12" Padding="20">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Activity" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock x:Name="Log" Text="No launcher messages yet." TextWrapping="Wrap" Foreground="#FFA6B0A8" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                <StackPanel x:Name="Settings" Visibility="Collapsed" Spacing="16">
+                    <TextBlock Text="Settings" FontSize="32" FontWeight="SemiBold" />
+                    <TextBlock Text="Product parent folder" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox x:Name="ParentPath" PlaceholderText="Choose parent folder" TextChanged="ParentChanged" />
+                        <Button Grid.Column="1" Content="Browse…" Click="BrowseClicked" Margin="8,0,0,0" />
+                    </Grid>
+                    <TextBlock Text="Hugging Face data folder" />
+                    <TextBox x:Name="HfPath" PlaceholderText="Defaults to product root\huggingface" />
+                    <TextBlock Text="Product folder name: Unsloth Studio Desktop" Foreground="#FFA6B0A8" />
+                    <ToggleSwitch x:Name="Tray" Header="Keep launcher available in the notification area" />
+                    <ToggleSwitch x:Name="Startup" Header="Start launcher when I sign in" />
+                    <ToggleSwitch x:Name="DesktopShortcut" Header="Create desktop shortcut" />
+                    <ToggleSwitch x:Name="StartMenuShortcut" Header="Create Start menu shortcut" />
+                    <Button x:Name="SaveButton" Content="Save settings" Click="SaveClicked" />
+                </StackPanel>
+                <StackPanel x:Name="About" Visibility="Collapsed" Spacing="12">
+                    <TextBlock Text="About" FontSize="32" FontWeight="SemiBold" />
+                    <TextBlock Text="Unsloth Studio Desktop" FontSize="20" />
+                    <TextBlock Text="Version: 0.1.0" Foreground="#FFA6B0A8" />
+                    <TextBlock Text="A portable Windows launcher for Unsloth Studio." />
+                    <TextBlock Text="License: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)." TextWrapping="Wrap" />
+                    <TextBlock Text="Source: https://github.com/rozsazoltan/unsloth-studio-portable" TextWrapping="Wrap" />
+                    <TextBlock Text="Acknowledgments: Unsloth AI, mise-en-place, Microsoft WinUI 3, and quota-usage-monitor native shell reference." TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel x:Name="Experimental" Visibility="Collapsed" Spacing="12">
+                    <TextBlock Text="Experimental" FontSize="32" FontWeight="SemiBold" />
+                    <Border Background="#FF292D28" Padding="18" CornerRadius="10">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Know what runs on your machine" FontSize="19" FontWeight="SemiBold" />
+                            <TextBlock Text="Studio setup uses upstream scripts and managed tools. This is not a sandbox: installer code runs with your Windows account permissions. Keep backups and review upstream changes." TextWrapping="Wrap" />
+                            <TextBlock Text="NVIDIA workloads need compatible drivers and hardware. CPU workflows may be slower. Windows integrations such as startup and shortcuts are opt-in." TextWrapping="Wrap" />
+                            <TextBlock Text="This companion requires the launcher process and its local pipe. It does not pretend to install or run Studio on its own." TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

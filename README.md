@@ -30,6 +30,12 @@ Install Rust's Windows MSVC toolchain, VS 2022 C++ Build Tools, Windows SDK 10.0
 
 ```powershell
 apm install
+cargo run
+```
+
+`cargo run` builds the self-contained WinUI companion automatically through Framework MSBuild; no environment variables or separate native build are needed. Build output stays under ignored native-ui/ and Cargo target/ directories. For release packaging, run:
+
+```powershell
 pwsh -NoProfile -File scripts/build-release.ps1
 ```
 

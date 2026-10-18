@@ -1,65 +1,69 @@
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashSet,
     env, fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
+    process::Command,
 };
 
 fn main() {
     println!("cargo:rerun-if-env-changed=UNSLOTH_STUDIO_UI");
-    println!("cargo:rerun-if-changed=native-ui/portable-files.txt");
-    let profile = env::var("PROFILE").unwrap_or_default();
-    let manifest = Path::new("native-ui/portable-files.txt");
-    let payload_root = env::var_os("UNSLOTH_NATIVE_PAYLOAD_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("native-ui"));
     println!("cargo:rerun-if-env-changed=UNSLOTH_NATIVE_PAYLOAD_DIR");
-    let mut payload = Vec::new();
-    if profile != "release" {
-        if let Ok(exe) = env::var("UNSLOTH_STUDIO_UI") {
-            let bytes =
-                fs::read(&exe).unwrap_or_else(|e| panic!("read UNSLOTH_STUDIO_UI={exe}: {e}"));
-            payload.push(("StudioUI.exe".to_owned(), bytes));
-        }
+
+    let repo = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    let manifest = repo.join("native-ui/portable-files.txt");
+    let native_helper = repo.join("scripts/build-native.ps1");
+    println!("cargo:rerun-if-changed={}", manifest.display());
+    println!("cargo:rerun-if-changed={}", native_helper.display());
+    track_native_inputs(&repo.join("native-ui"));
+
+    let profile = env::var("PROFILE").unwrap_or_default();
+    let native_dir_override = env::var_os("UNSLOTH_NATIVE_PAYLOAD_DIR").map(PathBuf::from);
+    let exe_override = env::var_os("UNSLOTH_STUDIO_UI").map(PathBuf::from);
+    if native_dir_override.is_some() && exe_override.is_some() {
+        panic!("set only one of UNSLOTH_NATIVE_PAYLOAD_DIR or UNSLOTH_STUDIO_UI");
     }
-    if payload.is_empty() && manifest.exists() {
-        for line in fs::read_to_string(manifest)
-            .expect("read native payload manifest")
-            .lines()
+
+    let payload_root = if let Some(root) = native_dir_override.as_ref() {
+        root.clone()
+    } else if let Some(exe) = exe_override.as_ref() {
+        if profile == "release" {
+            panic!(
+                "UNSLOTH_STUDIO_UI is a development override and cannot be used for release builds"
+            );
+        }
+        if exe
+            .file_name()
+            .is_none_or(|name| !name.eq_ignore_ascii_case("StudioUI.exe"))
+            || !exe.is_file()
         {
-            let relative = line.trim();
-            if relative.is_empty() || relative.starts_with('#') {
-                continue;
-            }
-            let candidates = matching_files(&payload_root, relative);
-            if candidates.is_empty() {
-                if profile == "release" && !relative.contains('*') {
-                    panic!(
-                        "missing native payload {}",
-                        payload_root.join(relative).display()
-                    );
-                }
-                continue;
-            }
-            for path in candidates {
-                println!("cargo:rerun-if-changed={}", path.display());
-                let bytes = fs::read(&path)
-                    .unwrap_or_else(|e| panic!("read native payload {}: {e}", path.display()));
-                let name = path
-                    .strip_prefix(&payload_root)
-                    .expect("payload under payload root")
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                payload.push((name, bytes));
-            }
+            panic!("UNSLOTH_STUDIO_UI must name an existing StudioUI.exe");
         }
+        exe.parent()
+            .expect("StudioUI.exe has a parent directory")
+            .to_owned()
+    } else {
+        repo.join("native-ui/x64/Release")
+    };
+
+    if profile != "release"
+        && native_dir_override.is_none()
+        && exe_override.is_none()
+        && env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows")
+    {
+        prepare_native_ui(&repo, &native_helper);
     }
-    if payload.is_empty() && profile == "release" {
-        panic!("release requires native-ui/portable-files.txt and the built StudioUI.exe payload");
-    }
+
+    let payload = collect_payload(&manifest, &payload_root);
+    validate_payload(&payload);
+    let track_override_payload = native_dir_override.is_some() || exe_override.is_some();
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     let mut encoded = Vec::new();
     encoded.extend_from_slice(&(payload.len() as u32).to_le_bytes());
-    for (name, bytes) in payload {
+    for (name, bytes, path) in payload {
+        if track_override_payload {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
         let name = name.into_bytes();
         encoded.extend_from_slice(&(name.len() as u32).to_le_bytes());
         encoded.extend_from_slice(&name);
@@ -70,28 +74,165 @@ fn main() {
     fs::write(out.join("native_payload.bin"), encoded).expect("write embedded payload");
 }
 
+fn prepare_native_ui(repo: &Path, helper: &Path) {
+    if !cfg!(windows) {
+        panic!("automatic WinUI preparation requires a Windows MSVC build host");
+    }
+    println!("cargo:warning=Preparing the self-contained WinUI companion with Framework MSBuild");
+    let status = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
+        .arg(helper)
+        .arg("-RepoRoot")
+        .arg(repo)
+        .current_dir(repo)
+        .status()
+        .unwrap_or_else(|error| {
+            panic!("could not start PowerShell for native WinUI preparation: {error}")
+        });
+    if !status.success() {
+        panic!("native WinUI preparation failed; install Visual Studio 2022 C++ Build Tools, Windows SDK 10.0.26100.0, and Framework MSBuild/XAML build tasks, then rerun cargo run");
+    }
+}
+
+fn track_native_inputs(root: &Path) {
+    fn visit(path: &Path) {
+        let entries = fs::read_dir(path).unwrap_or_else(|error| {
+            panic!(
+                "read native UI source directory {}: {error}",
+                path.display()
+            )
+        });
+        for entry in entries {
+            let entry =
+                entry.unwrap_or_else(|error| panic!("read native UI source entry: {error}"));
+            let child = entry.path();
+            if child.is_dir() {
+                let name = child
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or_default();
+                if !matches!(name, "obj" | "x64" | "packages" | ".vs") {
+                    visit(&child);
+                }
+            } else if is_native_input(&child) {
+                println!("cargo:rerun-if-changed={}", child.display());
+            }
+        }
+    }
+    visit(root);
+}
+
+fn is_native_input(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|extension| extension.to_str()),
+        Some("cpp" | "h" | "xaml" | "idl" | "vcxproj" | "manifest" | "props" | "targets")
+    ) || path
+        .file_name()
+        .is_some_and(|name| name == "portable-files.txt")
+}
+
+fn collect_payload(manifest: &Path, root: &Path) -> Vec<(String, Vec<u8>, PathBuf)> {
+    let lines = fs::read_to_string(manifest).unwrap_or_else(|error| {
+        panic!(
+            "read native payload manifest {}: {error}",
+            manifest.display()
+        )
+    });
+    let mut payload = Vec::new();
+    let mut names = HashSet::new();
+    for line in lines.lines() {
+        let relative = line.trim();
+        if relative.is_empty() || relative.starts_with('#') {
+            continue;
+        }
+        let relative_path = Path::new(relative);
+        if relative_path.is_absolute()
+            || relative_path
+                .components()
+                .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            panic!("unsafe native payload manifest path: {relative}");
+        }
+        let candidates = matching_files(root, relative);
+        if candidates.is_empty() {
+            panic!(
+                "missing required native payload {}",
+                root.join(relative).display()
+            );
+        }
+        for path in candidates {
+            let name = path
+                .strip_prefix(root)
+                .expect("payload candidate is under the payload root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            if !names.insert(name.clone()) {
+                panic!("duplicate native payload entry: {name}");
+            }
+            let bytes = fs::read(&path)
+                .unwrap_or_else(|error| panic!("read native payload {}: {error}", path.display()));
+            payload.push((name, bytes, path));
+        }
+    }
+    payload
+}
+
+fn validate_payload(payload: &[(String, Vec<u8>, PathBuf)]) {
+    if payload.is_empty() {
+        panic!("native payload manifest selected no files");
+    }
+    for required in [
+        "StudioUI.exe",
+        "Microsoft.WindowsAppRuntime.Bootstrap.dll",
+        "Microsoft.ui.xaml.dll",
+    ] {
+        if !payload
+            .iter()
+            .any(|(name, _, _)| name.eq_ignore_ascii_case(required))
+        {
+            panic!("native payload is incomplete; manifest payload is missing {required}");
+        }
+    }
+}
+
 fn matching_files(root: &Path, relative: &str) -> Vec<PathBuf> {
     if !relative.contains('*') {
-        let p = root.join(relative);
-        return if p.is_file() { vec![p] } else { Vec::new() };
+        let path = root.join(relative);
+        return if path.is_file() {
+            vec![path]
+        } else {
+            Vec::new()
+        };
     }
-    let path = Path::new(relative);
-    let parent = root.join(path.parent().unwrap_or(Path::new("")));
-    let pattern = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let pattern_path = Path::new(relative);
+    let parent = root.join(pattern_path.parent().unwrap_or(Path::new("")));
+    let pattern = pattern_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
     let Some((prefix, suffix)) = pattern.split_once('*') else {
         return Vec::new();
     };
-    fs::read_dir(parent)
+    let mut matches: Vec<_> = fs::read_dir(parent)
         .ok()
         .into_iter()
         .flatten()
         .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.is_file()
-                && p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with(prefix) && n.ends_with(suffix))
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(prefix) && name.ends_with(suffix))
         })
-        .collect()
+        .collect();
+    matches.sort();
+    matches
 }

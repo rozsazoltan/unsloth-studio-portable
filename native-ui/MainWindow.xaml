@@ -30,8 +30,12 @@
                 <NavigationViewItem x:Name="NavigationGeneralItem" Content="General" Tag="General" Icon="Setting" />
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
-                <NavigationViewItem x:Name="NavigationUpdateItem" Content="Update" Tag="Update" Icon="Download" />
-                <NavigationViewItem x:Name="NavigationExperimentalItem" Content="Experimental" Tag="Experimental" Icon="Important" />
+                <NavigationViewItem x:Name="NavigationUpdateItem" Content="Update" Tag="Update" Icon="Download" Visibility="Collapsed" />
+                <NavigationViewItem x:Name="NavigationExperimentalItem" Content="Experimental" Tag="Experimental">
+                    <NavigationViewItem.Icon>
+                        <PathIcon Data="F0 M9,1 H15 V8 C15,8.45 15.11,8.86 15.32,9.27 L20.08,18.59 A3,3 0 0 1 17.4,23 H6.6 A3,3 0 0 1 3.92,18.59 L8.68,9.27 C8.89,8.86 9,8.45 9,8 Z M11,3 V8 C11,8.67 10.87,9.16 10.46,9.98 L5.7,19.3 A1,1 0 0 0 6.6,21 H17.4 A1,1 0 0 0 18.3,19.3 L13.54,9.98 C13.13,9.16 13,8.67 13,8 V3 Z M6.45,14 H17.55 A1,1 0 0 1 17.55,16 H6.45 A1,1 0 0 1 6.45,14 Z" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem x:Name="NavigationAboutItem" Content="About" Tag="About" Icon="Help" />
             </NavigationView.FooterMenuItems>
             <Grid x:Name="PageContent">
@@ -71,21 +75,21 @@
                             <StackPanel x:Name="AboutPage" Visibility="Collapsed" Spacing="16">
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="10" Padding="20">
+                                        BorderThickness="1" CornerRadius="10" Padding="22">
                                     <StackPanel Spacing="18">
                                         <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                                             <Image x:Name="AboutLogo" Source="icon-256.png" Width="60" Height="60"
                                                    Stretch="Uniform" AutomationProperties.Name="Unsloth Studio Desktop icon" />
                                             <StackPanel VerticalAlignment="Center" Spacing="3">
                                                 <TextBlock Text="Unsloth Studio Desktop" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                <TextBlock Text="A native Windows shell for Unsloth Studio."
+                                                <TextBlock Text="A native Windows companion for Unsloth Studio."
                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </StackPanel>
                                         <Border Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                BorderThickness="1" CornerRadius="8" Padding="16,13">
-                                            <TextBlock Text="Studio management features are deferred. This shell does not bundle Unsloth Studio, mise, or uv."
+                                                BorderThickness="1" CornerRadius="10" Padding="16,13">
+                                            <TextBlock Text="Studio management features are deferred. This companion does not bundle Unsloth Studio, mise, or uv."
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         </Border>
                                         <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" />
@@ -105,6 +109,12 @@
                                                                  NavigateUri="https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE" />
                                                 <HyperlinkButton Content="C++/WinRT license (MIT)"
                                                                  NavigateUri="https://github.com/microsoft/cppwinrt/blob/master/LICENSE" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,4,0,0">
+                                                <Image Source="Assets/datarose-logo.png" Width="26" Height="26" Stretch="Uniform"
+                                                       AutomationProperties.Name="Datarose logo" />
+                                                <HyperlinkButton Content="Datarose" NavigateUri="https://datarose.net"
+                                                                 AutomationProperties.Name="Visit Datarose website" />
                                             </StackPanel>
                                             <TextBlock Text="Acknowledgments: Unsloth Studio, mise, and uv are planned manager dependencies; they are not included in this minimal shell."
                                                        FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"

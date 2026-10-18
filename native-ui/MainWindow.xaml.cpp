@@ -7,6 +7,7 @@
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Windows.System.h>
+#include <algorithm>
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -40,6 +41,19 @@ MainWindow::MainWindow() {
   }
 
   appWindow_ = AppWindow();
+  MONITORINFO monitor{sizeof(monitor)};
+  if (hwnd_ && GetMonitorInfoW(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST),
+                               &monitor)) {
+    const auto dpi = GetDpiForWindow(hwnd_);
+    const auto width = std::min<int>(MulDiv(1080, dpi, 96),
+                                     monitor.rcWork.right - monitor.rcWork.left);
+    const auto height = std::min<int>(MulDiv(760, dpi, 96),
+                                      monitor.rcWork.bottom - monitor.rcWork.top);
+    appWindow_.MoveAndResize(
+        {monitor.rcWork.left + (monitor.rcWork.right - monitor.rcWork.left - width) / 2,
+         monitor.rcWork.top + (monitor.rcWork.bottom - monitor.rcWork.top - height) / 2,
+         width, height});
+  }
   ExtendsContentIntoTitleBar(true);
   SetTitleBar(TitleBarDragRegion());
   appWindow_.TitleBar().IconShowOptions(
@@ -191,6 +205,7 @@ void MainWindow::OpenDeveloperPanel() {
     Navigation().FooterMenuItems().Append(developerNavigationItem_);
   }
   developerNavigationItem_.Visibility(Visibility::Visible);
+  NavigationUpdateItem().Visibility(Visibility::Visible);
   developerPanelActive_ = true;
   Navigation().SelectedItem(developerNavigationItem_);
 }
@@ -201,6 +216,7 @@ void MainWindow::DeveloperOffClicked(IInspectable const &,
   if (developerNavigationItem_) {
     developerNavigationItem_.Visibility(Visibility::Collapsed);
   }
+  NavigationUpdateItem().Visibility(Visibility::Collapsed);
   for (auto const &item : Navigation().MenuItems()) {
     auto navItem = item.try_as<NavigationViewItem>();
     if (navItem &&

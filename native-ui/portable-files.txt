@@ -3,6 +3,7 @@ af-ZA/Microsoft.UI.Xaml.Phone.dll.mui
 am-ET/Microsoft.ui.xaml.dll.mui
 am-ET/Microsoft.UI.Xaml.Phone.dll.mui
 App.xbf
+Assets/datarose-logo.png
 icon-256.png
 ar-SA/Microsoft.ui.xaml.dll.mui
 ar-SA/Microsoft.UI.Xaml.Phone.dll.mui

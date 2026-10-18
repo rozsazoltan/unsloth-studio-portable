@@ -1,0 +1,77 @@
+lockfile_version: '1'
+apm_version: 0.33.0
+dependencies:
+- repo_url: microsoft/win-dev-skills
+  name: ba9476bff58b20b4
+  host: github.com
+  resolved_commit: 5ce74fa89c49ca353c6ab03bd5889aa519aa9e5e
+  version: 5ce74fa
+  package_type: apm_package
+  content_hash: sha256:16a4c35dd0a65b06ace4f7fa184d8fa3aec1fa99a046729dbea9905eedf7d5ae
+- repo_url: microsoft/winappcli
+  materialization_repo_url: microsoft/winappCli
+  name: winui-design
+  host: github.com
+  resolved_commit: bda01d874dff552308eebd32cddee0f7e6d71b10
+  version: unknown
+  virtual_path: plugins/winui/agent-plugin/skills/winui-design
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/winui-design
+  - .agents/skills/winui-design/SKILL.md
+  - .agents/skills/winui-design/references/brushes-and-icons.md
+  - .agents/skills/winui-design/references/layout-review.md
+  - .agents/skills/winui-design/references/theme-accessibility.md
+  deployed_file_hashes:
+    .agents/skills/winui-design/SKILL.md: sha256:4d741256e7e1519a48a0d3e6e5dab85561706f1befe5008e169768c1deb1f26c
+    .agents/skills/winui-design/references/brushes-and-icons.md: sha256:6ad5799cf4e6fcdd6afa64442af62103f0a156594d46890885a6c2de65286142
+    .agents/skills/winui-design/references/layout-review.md: sha256:12210e16f1562687c6d02762c433c689cbabd7f4c3e5d9457e44928127fe2542
+    .agents/skills/winui-design/references/theme-accessibility.md: sha256:79179212801c3edc16566941b1667f3e6b2c819a3bdd32e941c47531d11ed1fc
+  content_hash: sha256:2f01305e37254885a52d45cd7a0f32d952c01dfe64d90f54d1d5a91a2f0ca50b
+deployments:
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/winui-design
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  active_owner: microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/winui-design/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  active_owner: microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  content_hash: sha256:4d741256e7e1519a48a0d3e6e5dab85561706f1befe5008e169768c1deb1f26c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/winui-design/references/brushes-and-icons.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  active_owner: microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  content_hash: sha256:6ad5799cf4e6fcdd6afa64442af62103f0a156594d46890885a6c2de65286142
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/winui-design/references/layout-review.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  active_owner: microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  content_hash: sha256:12210e16f1562687c6d02762c433c689cbabd7f4c3e5d9457e44928127fe2542
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/winui-design/references/theme-accessibility.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  active_owner: microsoft/winappcli/plugins/winui/agent-plugin/skills/winui-design
+  content_hash: sha256:79179212801c3edc16566941b1667f3e6b2c819a3bdd32e941c47531d11ed1fc

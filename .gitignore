@@ -1,0 +1,18 @@
+
+# APM dependencies
+apm_modules/
+
+# Local agent state and generated development skills
+.slim/
+.planning/
+.agents/skills/
+.opencode/skills/
+
+# Build output
+/target/
+/native-ui/packages/
+/native-ui/obj/
+/native-ui/x64/
+/native-ui/Generated Files/
+/native-ui/.vs/
+/dist/

@@ -205,7 +205,9 @@ void MainWindow::OpenDeveloperPanel() {
     Navigation().FooterMenuItems().Append(developerNavigationItem_);
   }
   developerNavigationItem_.Visibility(Visibility::Visible);
-  NavigationUpdateItem().Visibility(Visibility::Visible);
+  NavigationUpdateItem().Visibility(
+      ForceUpdateNavigationToggle().IsOn() ? Visibility::Visible
+                                           : Visibility::Collapsed);
   developerPanelActive_ = true;
   Navigation().SelectedItem(developerNavigationItem_);
 }
@@ -216,7 +218,9 @@ void MainWindow::DeveloperOffClicked(IInspectable const &,
   if (developerNavigationItem_) {
     developerNavigationItem_.Visibility(Visibility::Collapsed);
   }
-  NavigationUpdateItem().Visibility(Visibility::Collapsed);
+  NavigationUpdateItem().Visibility(
+      ForceUpdateNavigationToggle().IsOn() ? Visibility::Visible
+                                           : Visibility::Collapsed);
   for (auto const &item : Navigation().MenuItems()) {
     auto navItem = item.try_as<NavigationViewItem>();
     if (navItem &&
@@ -238,8 +242,13 @@ void MainWindow::DeveloperOffClicked(IInspectable const &,
   Navigation().SelectedItem(NavigationGeneralItem());
 }
 
-void MainWindow::DeveloperResetClicked(IInspectable const &,
+void MainWindow::DeveloperResetClicked(IInspectable const &sender,
                                        RoutedEventArgs const &) {
+  if (auto toggle = sender.try_as<ToggleSwitch>()) {
+    NavigationUpdateItem().Visibility(toggle.IsOn() ? Visibility::Visible
+                                                    : Visibility::Collapsed);
+    return;
+  }
   developerReturnPage_ = L"General";
 }
 

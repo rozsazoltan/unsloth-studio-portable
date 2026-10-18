@@ -73,15 +73,15 @@
                             </StackPanel>
                             <StackPanel x:Name="ExperimentalPage" Visibility="Collapsed" />
                             <StackPanel x:Name="AboutPage" Visibility="Collapsed" Spacing="16">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <Border Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="10" Padding="22">
+                                        BorderThickness="1" CornerRadius="10" Padding="20">
                                     <StackPanel Spacing="18">
                                         <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                                             <Image x:Name="AboutLogo" Source="icon-256.png" Width="60" Height="60"
                                                    Stretch="Uniform" AutomationProperties.Name="Unsloth Studio Desktop icon" />
-                                            <StackPanel VerticalAlignment="Center" Spacing="3">
-                                                <TextBlock Text="Unsloth Studio Desktop" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="Unsloth Studio Desktop" FontSize="27" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                 <TextBlock Text="A native Windows companion for Unsloth Studio."
                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
@@ -104,18 +104,30 @@
                                             <TextBlock Text="Third-party components" FontSize="16" FontWeight="SemiBold" />
                                             <TextBlock Text="This companion bundles Windows App SDK runtime files. The project uses C++/WinRT for native WinUI integration."
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                                <HyperlinkButton Content="Windows App SDK license (MIT)"
-                                                                 NavigateUri="https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE" />
-                                                <HyperlinkButton Content="C++/WinRT license (MIT)"
-                                                                 NavigateUri="https://github.com/microsoft/cppwinrt/blob/master/LICENSE" />
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,4,0,0">
-                                                <Image Source="Assets/datarose-logo.png" Width="26" Height="26" Stretch="Uniform"
-                                                       AutomationProperties.Name="Datarose logo" />
-                                                <HyperlinkButton Content="Datarose" NavigateUri="https://datarose.net"
-                                                                 AutomationProperties.Name="Visit Datarose website" />
-                                            </StackPanel>
+                                            <Grid ColumnSpacing="18" RowSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                                    <HyperlinkButton Content="Windows App SDK license (MIT)"
+                                                                     NavigateUri="https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE" />
+                                                    <HyperlinkButton Content="C++/WinRT license (MIT)"
+                                                                     NavigateUri="https://github.com/microsoft/cppwinrt/blob/master/LICENSE" />
+                                                </StackPanel>
+                                                <HyperlinkButton Grid.Column="1" NavigateUri="https://datarose.net"
+                                                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                                 BorderThickness="1" Padding="10,7,12,7"
+                                                                 AutomationProperties.Name="Visit Datarose website">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Image Source="Assets/datarose-logo.png" Width="26" Height="26" Stretch="Uniform"
+                                                               AutomationProperties.Name="Datarose logo" />
+                                                        <TextBlock Text="Datarose" FontSize="14" FontWeight="SemiBold"
+                                                                   Foreground="#FFE65F5C" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </HyperlinkButton>
+                                            </Grid>
                                             <TextBlock Text="Acknowledgments: Unsloth Studio, mise, and uv are planned manager dependencies; they are not included in this minimal shell."
                                                        FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                        TextWrapping="Wrap" />
@@ -124,10 +136,23 @@
                                 </Border>
                             </StackPanel>
                             <StackPanel x:Name="DeveloperPage" Visibility="Collapsed" Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Off" Click="DeveloperOffClicked" />
-                                    <Button Content="Reset" Click="DeveloperResetClicked" />
-                                </StackPanel>
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="18">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="Developer controls" FontSize="16" FontWeight="SemiBold" />
+                                             <TextBlock Text="Show the Update navigation entry for development. This does not check for or run updates."
+                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                         </StackPanel>
+                                         <ToggleSwitch x:Name="ForceUpdateNavigationToggle" Header="Show Update navigation"
+                                                       Toggled="DeveloperResetClicked" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Content="Off" Click="DeveloperOffClicked" />
+                                            <Button Content="Reset" Click="DeveloperResetClicked" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>

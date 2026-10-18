@@ -1,28 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <defs>
-    <linearGradient id="night" x1="28" y1="18" x2="226" y2="244" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#193C35"/>
-      <stop offset="1" stop-color="#0B201F"/>
+    <linearGradient id="teal" x1="30" y1="18" x2="226" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16B9B0"/>
+      <stop offset="1" stop-color="#087C83"/>
     </linearGradient>
-    <linearGradient id="case" x1="73" y1="117" x2="184" y2="218" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D9F27C"/>
-      <stop offset="1" stop-color="#8FCB59"/>
+    <linearGradient id="crate" x1="43" y1="182" x2="213" y2="229" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173D3B"/>
+      <stop offset="1" stop-color="#102D30"/>
     </linearGradient>
   </defs>
-  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#night)"/>
-  <rect x="9" y="9" width="238" height="238" rx="57" fill="none" stroke="#B9EDB3" stroke-opacity=".18" stroke-width="2"/>
-  <circle cx="128" cy="119" r="75" fill="#D7B58E"/>
-  <circle cx="76" cy="101" r="29" fill="#B98F6C"/>
-  <circle cx="180" cy="101" r="29" fill="#B98F6C"/>
-  <path d="M128 52c-43 0-69 29-69 70 0 31 15 53 39 65-1 12-8 21-22 28h104c-14-7-21-16-22-28 24-12 39-34 39-65 0-41-26-70-69-70Z" fill="#F4E4C9"/>
-  <path d="M89 111c0-14 9-23 21-23s21 9 21 23-8 23-21 23-21-9-21-23Zm36 0c0-14 9-23 21-23s21 9 21 23-8 23-21 23-21-9-21-23Z" fill="#51463E"/>
-  <circle cx="105" cy="111" r="3.5" fill="#F4E4C9"/>
-  <circle cx="146" cy="111" r="3.5" fill="#F4E4C9"/>
-  <path d="M128 123c-10 0-16 6-16 13 0 7 7 11 16 11s16-4 16-11c0-7-6-13-16-13Z" fill="#473D36"/>
-  <path d="M128 146v11m0-2c-3 7-9 10-15 11m15-11c3 7 9 10 15 11" fill="none" stroke="#625044" stroke-width="4" stroke-linecap="round"/>
-  <path d="M72 128c3 17 11 29 23 38" fill="none" stroke="#FFF4DD" stroke-opacity=".65" stroke-width="5" stroke-linecap="round"/>
-  <path d="M65 179h126v43H65z" fill="url(#case)" stroke="#0B201F" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M65 183h126l-17 18H82l-17-18Z" fill="#E6F79D"/>
-  <path d="M82 201v21m92-21v21" stroke="#315941" stroke-width="6"/>
-  <path d="M113 201h30" stroke="#315941" stroke-width="6" stroke-linecap="round"/>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#teal)"/>
+  <rect x="9" y="9" width="238" height="238" rx="53" fill="none" stroke="#D7FFFA" stroke-opacity=".45" stroke-width="2"/>
+
+  <!-- Independently drawn sloth-face emblem based on the user-provided visual reference. -->
+  <path d="M76 74c-14-13-37-5-37 14 0 13 8 23 20 25m121-39c14-13 37-5 37 14 0 13-8 23-20 25" fill="#101819" stroke="#F5FFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 39c-48 0-78 33-78 82 0 44 25 74 61 86 11 4 24 5 34 0 36-12 61-42 61-86 0-49-30-82-78-82Z" fill="#101819" stroke="#F5FFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M83 118c2-19 12-32 28-33 8 0 14 4 17 11 4-7 10-11 18-11 16 1 26 14 28 33 2 17-6 34-18 44-9 8-19 12-28 12s-19-4-28-12c-12-10-19-27-17-44Z" fill="#F5FFFF"/>
+  <path d="M91 120c3-11 10-18 19-18 9 0 14 7 15 17 1 10-5 17-14 18-10 1-19-6-20-17Zm45-1c1-10 7-17 16-17 9 0 16 7 18 18 1 11-8 18-18 17-10-1-17-8-16-18Z" fill="#101819"/>
+  <ellipse cx="109" cy="120" rx="3.5" ry="4" fill="#F5FFFF"/>
+  <ellipse cx="153" cy="120" rx="3.5" ry="4" fill="#F5FFFF"/>
+  <path d="M128 137c-10 0-16 6-16 13 0 7 7 11 16 11s16-4 16-11c0-7-6-13-16-13Z" fill="#101819"/>
+  <path d="M128 160v10m0-3c-4 6-9 9-15 10m15-10c4 6 9 9 15 10" fill="none" stroke="#101819" stroke-width="4" stroke-linecap="round"/>
+  <path d="M85 148c4 13 11 23 21 30m65-30c-4 13-11 23-21 30" fill="none" stroke="#BDEDEA" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Integrated storage crate frame: rim, reinforced corners, and slatted front. -->
+  <path d="M37 185h182v42H37z" fill="url(#crate)" stroke="#F5FFFF" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M34 180h188v12H34z" fill="#101819" stroke="#F5FFFF" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M55 195v25m146-25v25M75 204h106" fill="none" stroke="#75D8CF" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="47" cy="186" r="2.5" fill="#F5FFFF"/>
+  <circle cx="209" cy="186" r="2.5" fill="#F5FFFF"/>
 </svg>

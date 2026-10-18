@@ -4,9 +4,9 @@
 
 ## Artwork and attribution
 
-Original artwork created for this independent launcher. The design uses a generic sloth portrait and a storage-crate motif, with a green palette inspired by Unsloth's visual identity. It does not reproduce Unsloth's logo or other official artwork.
+Original launcher artwork based on the visual reference supplied by the user: a teal field with a black sloth-face emblem, white outline, and light facial details. The emblem is independently redrawn and framed by an integrated storage-crate motif; it is not an official Unsloth asset.
 
-Unsloth and related marks belong to their respective owners. This project is unofficial, is not endorsed by Unsloth, and makes no claim of trademark permission or affiliation. No official logo asset or logo-use permission is claimed.
+Unsloth and related marks belong to their respective owners. This project is unofficial and is not endorsed by Unsloth. It makes no claim of trademark permission or affiliation. Fidelity to the supplied 100x100 reference may be approximate because the source artwork was not included as an editable asset.
 
 ## Export sizes
 

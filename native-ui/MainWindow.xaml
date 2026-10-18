@@ -4,9 +4,37 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Unsloth Studio Desktop">
     <Grid Background="#FF151916">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Padding="32">
-            <TextBlock Text="Unsloth Studio Desktop" FontSize="28" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="A native Windows app is ready." Foreground="#FFA6B0A8" TextAlignment="Center" TextWrapping="Wrap" />
+        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
+                Padding="10,0" MinWidth="40" MinHeight="40"
+                AutomationProperties.Name="More options">
+            <Button.Content>…</Button.Content>
+            <Button.Flyout>
+                <MenuFlyout>
+                    <MenuFlyoutItem Text="General" Click="GeneralClicked" />
+                    <MenuFlyoutItem Text="Update" Click="UpdateClicked" />
+                    <MenuFlyoutItem Text="Experimental" Click="ExperimentalClicked" />
+                    <MenuFlyoutItem Text="About" Click="AboutClicked" />
+                </MenuFlyout>
+            </Button.Flyout>
+        </Button>
+        <StackPanel x:Name="GeneralPage" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
+            <TextBlock Text="General" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
+            <TextBlock Text="Minimal native desktop shell" Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+            <TextBlock Text="Studio management is not available yet." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel x:Name="UpdatePage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
+            <TextBlock Text="Update" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
+            <TextBlock Text="Update management is not available in this minimal shell." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel x:Name="ExperimentalPage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
+            <TextBlock Text="Experimental" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
+            <TextBlock Text="No experimental features are enabled." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel x:Name="AboutPage" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="32" MaxWidth="560">
+            <TextBlock Text="Unsloth Studio Desktop" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
+            <TextBlock Text="A minimal native Windows shell for Unsloth Studio." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+            <TextBlock Text="License: AGPL-3.0-or-later" Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+            <TextBlock Text="Acknowledgments: Unsloth, mise, and quota-usage-monitor." Foreground="{ThemeResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" />
         </StackPanel>
     </Grid>
 </Window>

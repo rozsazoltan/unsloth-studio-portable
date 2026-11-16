@@ -151,6 +151,57 @@ fn migrate_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn export_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "Settings cannot be exported while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .set_file_name("launcher-settings.json")
+        .add_filter("JSON", &["json"])
+        .save_file()
+    else {
+        return Ok(None);
+    };
+    let settings = s.state.lock().unwrap().settings.clone();
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&settings).map_err(anyhow::Error::from)?,
+    )
+    .map_err(anyhow::Error::from)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn import_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<State>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "Settings cannot be imported while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+    let settings: Settings =
+        serde_json::from_slice(&std::fs::read(path).map_err(anyhow::Error::from)?)
+            .map_err(anyhow::Error::from)?;
+    if settings.root.trim().is_empty() || settings.hf_home.trim().is_empty() {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "root and hugging face folder are required".into(),
+        });
+    }
+    settings.save()?;
+    Ok(Some(apply_settings(&s, settings)))
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn pick_directory(target: String) -> CmdResult<Option<String>> {
     if !matches!(target.as_str(), "root_parent" | "hf_home") {
         return Err(CmdError {
@@ -333,6 +384,8 @@ fn main() {
             save_settings,
             find_legacy_settings,
             migrate_settings,
+            export_settings,
+            import_settings,
             pick_directory,
             install,
             cancel_install,

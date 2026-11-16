@@ -196,6 +196,22 @@ export default function App() {
       setBusy(false);
     }
   };
+  const exportSettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try { await api.exportSettings(); }
+    catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
+  const importSettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      const next = await api.importSettings();
+      if (next) setState(next);
+    } catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
 
   const guardRunning = () => {
     if (!working()) return false;
@@ -356,7 +372,7 @@ export default function App() {
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
                     <span class="overflow-title">Settings file</span>
-                    <p>This file stores your chosen install folder and options. In portable mode, it lives next to the executable.</p>
+                    <p>This file stores your chosen install folder and options. It lives in the install folder; a small pointer next to the executable records which folder is active.</p>
                     <Show when={current().settings_exists} fallback={<p class="overflow-path">Portable settings file was not found.</p>}>
                       <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
                     </Show>
@@ -367,6 +383,16 @@ export default function App() {
                       <p>The file will be moved, not copied.</p>
                     </div>
                   </Show>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void exportSettings()}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg>
+                      <span>Export settings</span>
+                    </button>
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void importSettings()}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 6v8m-3-3 3 3 3-3M3 7V3h10v4" /></svg>
+                      <span>Import settings</span>
+                    </button>
+                  </div>
                   <div class="overflow-port">
                     <Show when={!legacySearchComplete()}>
                       <button class="text-button menu-action" disabled={busy()} onClick={() => void searchLegacySettings()}>

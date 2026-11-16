@@ -35,6 +35,18 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Prepare release version
         if: ${{ github.event_name == 'workflow_dispatch' }}
         shell: pwsh

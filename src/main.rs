@@ -60,6 +60,10 @@ fn save_settings(
     }
     settings.apply_folder_name(move_folder)?;
     settings.save()?;
+    Ok(apply_settings(&s, settings))
+}
+
+fn apply_settings(s: &Shared, settings: Settings) -> State {
     let mut st = s.state.lock().unwrap();
     st.settings = settings;
     let (hf_env_var, hf_home) = lifecycle::effective_hf_home(&st.settings.hf_home);
@@ -85,7 +89,58 @@ fn save_settings(
             lifecycle::Phase::Absent
         };
     }
-    Ok(st.clone())
+    st.settings_path = settings::settings_path()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    st.clone()
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn find_legacy_settings() -> CmdResult<Option<String>> {
+    let active = settings::settings_path()?;
+    Ok(settings::legacy_path()
+        .filter(|path| path != &active)
+        .map(|path| path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn migrate_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "The settings file cannot be migrated while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let legacy = settings::legacy_path().ok_or_else(|| CmdError {
+        code: "invalid_argument".into(),
+        message: "No settings file was found in the default location.".into(),
+    })?;
+    let target = settings::settings_path()?;
+    if target.exists() {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: format!(
+                "A settings file already exists at {}. It was not overwritten.",
+                target.display()
+            ),
+        });
+    }
+    std::fs::create_dir_all(target.parent().ok_or_else(|| CmdError {
+        code: "internal".into(),
+        message: "settings path has no parent".into(),
+    })?)
+    .map_err(anyhow::Error::from)?;
+    if let Err(rename_error) = std::fs::rename(&legacy, &target) {
+        if let Err(copy_error) = std::fs::copy(&legacy, &target) {
+            return Err(CmdError {
+                code: "internal".into(),
+                message: format!("{rename_error}; fallback copy failed: {copy_error}"),
+            });
+        }
+        std::fs::remove_file(&legacy).map_err(anyhow::Error::from)?;
+    }
+    let settings = Settings::load_or_default()?;
+    Ok(apply_settings(&s, settings))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -261,6 +316,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_state,
             save_settings,
+            find_legacy_settings,
+            migrate_settings,
             pick_directory,
             install,
             cancel_install,

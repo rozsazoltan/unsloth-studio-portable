@@ -13,6 +13,8 @@ export default function App() {
   const [removeText, setRemoveText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [requestError, setRequestError] = createSignal<AppError | null>(null);
+  const [legacySettingsPath, setLegacySettingsPath] = createSignal<string | null>(null);
+  const [legacySearchComplete, setLegacySearchComplete] = createSignal(false);
   const [version, setVersion] = createSignal("dev");
   const [followingOutput, setFollowingOutput] = createSignal(true);
   const [clock, setClock] = createSignal(Date.now() / 1000);
@@ -163,6 +165,31 @@ export default function App() {
     try {
       const result = await action();
       if (result) setState(result);
+    } catch (error) {
+      setRequestError(toAppError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const searchLegacySettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      setLegacySettingsPath(await api.findLegacySettings());
+      setLegacySearchComplete(true);
+    } catch (error) {
+      setRequestError(toAppError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const migrateLegacySettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      setState(await api.migrateSettings());
+      setLegacySettingsPath(null);
+      setLegacySearchComplete(false);
     } catch (error) {
       setRequestError(toAppError(error));
     } finally {
@@ -332,6 +359,21 @@ export default function App() {
                     <p>This file stores your chosen install folder and options. In portable mode, it lives next to the executable.</p>
                   </div>
                   <p class="overflow-path">{current().settings_path}</p>
+                </div>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <button class="text-button folder-keep-link" disabled={busy()} onClick={() => void searchLegacySettings()}>Search the default location</button>
+                    <Show when={legacySearchComplete() && !legacySettingsPath()}>
+                      <p>No settings file was found in the default location.</p>
+                    </Show>
+                    <Show when={legacySettingsPath()}>
+                      <p class="overflow-path">{legacySettingsPath()}</p>
+                      <div class="overflow-port">
+                        <button class="text-button menu-action" disabled={busy()} onClick={() => void migrateLegacySettings()}>Move settings here</button>
+                      </div>
+                      <p>The file is moved, not copied.</p>
+                    </Show>
+                  </div>
                 </div>
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">

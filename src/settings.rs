@@ -108,3 +108,11 @@ pub fn settings_path() -> Result<PathBuf> {
     let _ = PATH.set(path.clone());
     Ok(PATH.get().cloned().unwrap_or(path))
 }
+
+pub fn legacy_path() -> Option<PathBuf> {
+    let path = PathBuf::from(
+        std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("USERPROFILE"))?,
+    )
+    .join("Unsloth Studio Desktop/launcher-settings.json");
+    path.is_file().then_some(path)
+}

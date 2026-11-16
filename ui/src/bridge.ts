@@ -27,6 +27,8 @@ export const api = {
   saveSettings: (settings: Settings, moveFolder = true) => isTauri() ? invoke<State>("save_settings", { settings, move_folder: moveFolder }) : Promise.resolve({ ...previewState, settings }),
   pickDirectory: (target: "root_parent" | "hf_home") => invoke<string | null>("pick_directory", { target }),
   install: (approveEffects: boolean) => invoke<State>("install", { approve_effects: approveEffects }),
+  findLegacySettings: () => isTauri() ? invoke<string | null>("find_legacy_settings") : Promise.resolve(null),
+  migrateSettings: () => isTauri() ? invoke<State>("migrate_settings") : Promise.resolve(previewState),
   cancel: () => isTauri() ? invoke<State>("cancel") : Promise.resolve(previewState),
   start: () => invoke<State>("start"),
   stop: () => invoke<State>("stop"),

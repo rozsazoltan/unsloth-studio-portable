@@ -27,6 +27,107 @@ impl From<anyhow::Error> for CmdError {
 }
 type CmdResult<T> = Result<T, CmdError>;
 
+fn account_db_path(shared: &Shared) -> std::path::PathBuf {
+    std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app/auth/auth.db")
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn backup_account(
+    _app: tauri::AppHandle,
+    s: tauri::State<'_, Arc<Shared>>,
+) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be backed up while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    let source = account_db_path(&s);
+    if !source.exists() {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "no Studio account database was found".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .set_file_name("auth.db")
+        .add_filter("SQLite database", &["db"])
+        .save_file()
+    else {
+        return Ok(None);
+    };
+    std::fs::copy(source, &path).map_err(anyhow::Error::from)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn restore_account(
+    _app: tauri::AppHandle,
+    s: tauri::State<'_, Arc<Shared>>,
+) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be restored while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    if matches!(
+        s.state.lock().unwrap().phase,
+        Phase::Starting | Phase::Running | Phase::Stopping
+    ) {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "stop Studio before restoring the account".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("SQLite database", &["db"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+    let target = account_db_path(&s);
+    std::fs::create_dir_all(target.parent().unwrap()).map_err(anyhow::Error::from)?;
+    std::fs::copy(&path, &target).map_err(anyhow::Error::from)?;
+    for suffix in ["-wal", "-shm"] {
+        match std::fs::remove_file(target.with_file_name(format!("auth.db{suffix}"))) {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(anyhow::Error::from(error).into()),
+        }
+    }
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn delete_account(confirm: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+    if confirm != "REMOVE" {
+        return Err(CmdError {
+            code: "confirm_required".into(),
+            message: "type REMOVE to confirm".into(),
+        });
+    }
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be deleted while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    if matches!(
+        s.state.lock().unwrap().phase,
+        Phase::Starting | Phase::Running | Phase::Stopping
+    ) {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "stop Studio before deleting the account".into(),
+        });
+    }
+    let target = account_db_path(&s);
+    for path in [
+        target.clone(),
+        target.with_file_name("auth.db-wal"),
+        target.with_file_name("auth.db-shm"),
+    ] {
+        match std::fs::remove_file(path) {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(anyhow::Error::from(error).into()),
+        }
+    }
+    Ok(s.state.lock().unwrap().clone())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn get_state(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
     Ok(s.state.lock().unwrap().clone())
@@ -386,6 +487,9 @@ fn main() {
             migrate_settings,
             export_settings,
             import_settings,
+            backup_account,
+            restore_account,
+            delete_account,
             pick_directory,
             install,
             cancel_install,

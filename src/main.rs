@@ -31,6 +31,39 @@ fn studio_data_path(shared: &Shared) -> std::path::PathBuf {
     std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app")
 }
 
+fn is_runtime_entry(name: &str) -> bool {
+    matches!(
+        name,
+        "unsloth_studio"
+            | "python"
+            | "uv"
+            | "source"
+            | "bin"
+            | "share"
+            | "llama.cpp"
+            | "whisper.cpp"
+            | "audio.cpp"
+    ) || name.starts_with(".venv_t5")
+}
+
+fn data_entries(root: &std::path::Path) -> anyhow::Result<Vec<std::ffi::OsString>> {
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    entries
+        .map(|entry| {
+            let entry = entry?;
+            Ok(
+                (!is_runtime_entry(&entry.file_name().to_string_lossy()))
+                    .then(|| entry.file_name()),
+            )
+        })
+        .filter_map(|entry| entry.transpose())
+        .collect()
+}
+
 fn run_powershell(script: &str) -> anyhow::Result<()> {
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", script])
@@ -40,6 +73,15 @@ fn run_powershell(script: &str) -> anyhow::Result<()> {
 }
 
 fn copy_entry(source: &std::path::Path, destination: &std::path::Path) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !std::fs::symlink_metadata(source)?.file_type().is_symlink(),
+        "symbolic links are not supported in Studio data archives"
+    );
+    if std::fs::symlink_metadata(destination)
+        .is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
+        anyhow::bail!("Studio data destination contains a symbolic link");
+    }
     if source.is_dir() {
         std::fs::create_dir_all(destination)?;
         for entry in std::fs::read_dir(source)? {
@@ -57,7 +99,10 @@ fn copy_entry(source: &std::path::Path, destination: &std::path::Path) -> anyhow
 
 fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
     fn visit(path: &std::path::Path) -> anyhow::Result<()> {
-        if path.is_dir() {
+        let metadata = std::fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink() {
+            return Ok(());
+        } else if metadata.is_dir() {
             for entry in std::fs::read_dir(path)? {
                 visit(&entry?.path())?;
             }
@@ -106,20 +151,8 @@ fn backup_account(
             data.join("studio.db").is_file(),
             "invalid_argument:The Studio data folder has no studio.db"
         );
-        for entry in [
-            "studio.db",
-            "auth",
-            "accounts",
-            "rag",
-            "assets",
-            "outputs",
-            "exports",
-            "cache",
-        ] {
-            let source = data.join(entry);
-            if source.exists() {
-                copy_entry(&source, &temp.join(entry))?;
-            }
+        for entry in data_entries(&data)? {
+            copy_entry(&data.join(&entry), &temp.join(&entry))?;
         }
         let source = temp.join("*").to_string_lossy().replace('\'', "''");
         let destination = path.to_string_lossy().replace('\'', "''");
@@ -169,26 +202,34 @@ fn restore_account(
             run_powershell(&format!(
                 "Expand-Archive -LiteralPath '{source}' -DestinationPath '{destination}' -Force"
             ))?;
-            let marker = temp.join("studio.db");
-            anyhow::ensure!(
-                marker.is_file(),
-                "invalid_argument:the archive does not look like a Studio data backup"
-            );
+            let source_root = if temp.join("studio.db").is_file() {
+                temp.clone()
+            } else {
+                let mut roots = std::fs::read_dir(&temp)?
+                    .filter_map(|entry| entry.ok())
+                    .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+                    .map(|entry| entry.path())
+                    .filter(|path| path.join("studio.db").is_file());
+                let Some(root) = roots.next() else {
+                    anyhow::bail!(
+                        "invalid_argument:the archive does not look like a Studio data backup"
+                    );
+                };
+                anyhow::ensure!(
+                    roots.next().is_none(),
+                    "invalid_argument:the archive does not look like a Studio data backup"
+                );
+                root
+            };
             std::fs::create_dir_all(&data)?;
-            for entry in [
-                "studio.db",
-                "auth",
-                "accounts",
-                "rag",
-                "assets",
-                "outputs",
-                "exports",
-                "cache",
-            ] {
-                let source = temp.join(entry);
-                if source.exists() {
-                    copy_entry(&source, &data.join(entry))?;
-                }
+            let source_root = std::fs::canonicalize(&source_root)?;
+            for entry in data_entries(&source_root)? {
+                let source = source_root.join(&entry);
+                anyhow::ensure!(
+                    std::fs::canonicalize(&source)?.starts_with(&source_root),
+                    "archive entry escaped temporary folder"
+                );
+                copy_entry(&source, &data.join(entry))?;
             }
             remove_database_sidecars(&data)?;
             Ok(())
@@ -232,18 +273,11 @@ fn delete_account(confirm: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResul
         });
     }
     let data = studio_data_path(&s);
-    for entry in [
-        "studio.db",
-        "auth",
-        "accounts",
-        "rag",
-        "assets",
-        "outputs",
-        "exports",
-        "cache",
-    ] {
+    for entry in data_entries(&data)? {
         let path = data.join(entry);
-        let result = if path.is_dir() {
+        let result = if std::fs::symlink_metadata(&path)
+            .is_ok_and(|metadata| metadata.file_type().is_dir())
+        {
             std::fs::remove_dir_all(path)
         } else {
             std::fs::remove_file(path)

@@ -383,7 +383,7 @@ export default function App() {
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
                     <span class="overflow-title">Studio config</span>
-                    <p>The archive contains the Studio data folder: studio.db, auth, accounts, rag, assets, outputs, exports, and cache. Stop Studio before restoring or deleting data. The launcher’s launcher-settings.json is not included.</p>
+                    <p>Back up config saves the whole Studio data folder. Restore config brings that state back; stop Studio first. Delete config resets Studio to a fresh state. The launcher’s launcher-settings.json is not included.</p>
                   </div>
                   <div class="overflow-port">
                     <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.backupAccount)}>
@@ -530,7 +530,7 @@ export default function App() {
         <section class="inline-panel remove-panel">
           <div>
             <h2>Delete the Studio config?</h2>
-            <p>This deletes studio.db, auth, accounts, rag, assets, outputs, exports, and cache from the Studio data folder. Stop Studio first. The launcher’s launcher-settings.json is not included.</p>
+            <p>Delete config resets Studio to a fresh state by deleting the whole Studio data folder. Stop Studio first. Restore config brings a saved state back. The launcher’s launcher-settings.json is not included.</p>
           </div>
           <label class="confirm-field">Type REMOVE to confirm
             <input value={removeText()} onInput={event => setRemoveText(event.currentTarget.value)} autocomplete="off" />

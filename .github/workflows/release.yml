@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      # Tag filters are globs, not regex; the CalVer format is enforced below.
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Setup MSVC build tools
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build portable executable
+        shell: pwsh
+        run: ./scripts/build-release.ps1
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG
+          if ($version -notmatch '^v\d{4}\.\d{1,2}\.\d+$') {
+            throw "Invalid CalVer tag: $version"
+          }
+          gh release create $version dist/unsloth-studio-portable-windows-x64.exe `
+            --title $version `
+            --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release creation failed with exit code $LASTEXITCODE" }

@@ -1,0 +1,10 @@
+# Managed by Unsloth Studio Desktop. Revision 1.
+# The launcher writes this file, installs it with `mise install` from the product root
+# and runs Studio through `mise exec` with this configuration. Changes are applied only
+# after approval in the launcher; unrelated edits are never overwritten silently.
+[tools]
+bun = "1"
+cmake = "latest"
+node = "24"
+python = "3.13"
+uv = "0.13.1"

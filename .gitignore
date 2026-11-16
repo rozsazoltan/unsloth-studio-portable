@@ -1,0 +1,16 @@
+
+# APM dependencies
+apm_modules/
+
+# Local agent state and generated development skills
+.slim/
+.planning/
+.agents/skills/
+.opencode/
+
+# Build output
+/target/
+/gen/
+/ui/node_modules/
+/ui/dist/
+/dist/

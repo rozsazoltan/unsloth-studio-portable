@@ -1,0 +1,16 @@
+name: unsloth-studio-portable
+version: 1.0.0
+description: APM project for unsloth-studio-portable
+author: Rózsa Zoltán
+# Which agent platforms to deploy to (uncomment to pin):
+# targets:
+#   - copilot
+#   - claude
+
+dependencies:
+  apm:
+    - microsoft/win-dev-skills
+    - microsoft/winappCli/plugins/winui/agent-plugin/skills/winui-design
+  mcp: []
+includes: auto
+scripts: {}

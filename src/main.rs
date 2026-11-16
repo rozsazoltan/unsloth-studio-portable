@@ -98,39 +98,6 @@ fn data_entries(root: &std::path::Path) -> anyhow::Result<Vec<std::ffi::OsString
         .collect()
 }
 
-fn run_powershell(script: &str) -> anyhow::Result<()> {
-    let status = std::process::Command::new("powershell")
-        .args(["-NoProfile", "-Command", script])
-        .status()?;
-    anyhow::ensure!(status.success(), "PowerShell archive operation failed");
-    Ok(())
-}
-
-fn copy_entry(source: &std::path::Path, destination: &std::path::Path) -> anyhow::Result<()> {
-    anyhow::ensure!(
-        !std::fs::symlink_metadata(source)?.file_type().is_symlink(),
-        "symbolic links are not supported in Studio data archives"
-    );
-    if std::fs::symlink_metadata(destination)
-        .is_ok_and(|metadata| metadata.file_type().is_symlink())
-    {
-        anyhow::bail!("Studio data destination contains a symbolic link");
-    }
-    if source.is_dir() {
-        std::fs::create_dir_all(destination)?;
-        for entry in std::fs::read_dir(source)? {
-            let entry = entry?;
-            copy_entry(&entry.path(), &destination.join(entry.file_name()))?;
-        }
-    } else if source.is_file() {
-        if let Some(parent) = destination.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::copy(source, destination)?;
-    }
-    Ok(())
-}
-
 fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
     fn visit(path: &std::path::Path) -> anyhow::Result<()> {
         let metadata = std::fs::symlink_metadata(path)?;
@@ -157,12 +124,6 @@ fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
     visit(root)
 }
 
-fn temp_folder() -> anyhow::Result<std::path::PathBuf> {
-    let path = std::env::temp_dir().join(format!("unsloth-account-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir(&path)?;
-    Ok(path)
-}
-
 #[tauri::command(rename_all = "snake_case")]
 fn backup_account(
     _app: tauri::AppHandle,
@@ -181,25 +142,48 @@ fn backup_account(
     else {
         return Ok(None);
     };
-    let temp = temp_folder()?;
     let result = (|| -> anyhow::Result<()> {
         let data = studio_data_path(&s);
         anyhow::ensure!(
             data.join("studio.db").is_file(),
             "invalid_argument:The Studio data folder has no studio.db"
         );
-        for entry in data_entries(&data)? {
-            copy_entry(&data.join(&entry), &temp.join(&entry))?;
+        let file = std::fs::File::create(&path)?;
+        let mut archive = zip::ZipWriter::new(file);
+        fn add_path(
+            archive: &mut zip::ZipWriter<std::fs::File>,
+            root: &std::path::Path,
+            relative: &std::path::Path,
+        ) -> anyhow::Result<()> {
+            let source = root.join(relative);
+            let metadata = std::fs::symlink_metadata(&source)?;
+            anyhow::ensure!(
+                !metadata.file_type().is_symlink(),
+                "symbolic links are not supported in Studio data archives"
+            );
+            if metadata.is_dir() {
+                for entry in std::fs::read_dir(source)? {
+                    let entry = entry?;
+                    add_path(archive, root, &relative.join(entry.file_name()))?;
+                }
+            } else if metadata.is_file() {
+                let name = relative.to_string_lossy().replace('\\', "/");
+                archive.start_file(name, zip::write::SimpleFileOptions::default())?;
+                let mut file = std::fs::File::open(source)?;
+                std::io::copy(&mut file, archive)?;
+            }
+            Ok(())
         }
-        let source = temp.join("*").to_string_lossy().replace('\'', "''");
-        let destination = path.to_string_lossy().replace('\'', "''");
-        run_powershell(&format!(
-            "Compress-Archive -Path '{source}' -DestinationPath '{destination}' -Force"
-        ))
+        for entry in data_entries(&data)? {
+            add_path(&mut archive, &data, std::path::Path::new(&entry))?;
+        }
+        archive.finish()?;
+        Ok(())
     })();
-    let cleanup = std::fs::remove_dir_all(&temp);
-    result?;
-    cleanup.map_err(anyhow::Error::from)?;
+    if let Err(error) = result {
+        let _ = std::fs::remove_file(&path);
+        return Err(error.into());
+    }
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
@@ -232,64 +216,62 @@ fn restore_account(
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
     {
-        let temp = temp_folder()?;
-        let result = (|| -> anyhow::Result<()> {
-            let source = path.to_string_lossy().replace('\'', "''");
-            let destination = temp.to_string_lossy().replace('\'', "''");
-            run_powershell(&format!(
-                "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('{source}', '{destination}')"
-            ))?;
-            let source_root = if temp.join("studio.db").is_file() {
-                temp.clone()
-            } else {
-                fn find_root(dir: &std::path::Path, depth: usize) -> Option<std::path::PathBuf> {
-                    if depth == 0 {
-                        return None;
-                    }
-                    let mut folders = Vec::new();
-                    for entry in std::fs::read_dir(dir).ok()?.filter_map(|entry| entry.ok()) {
-                        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-                            let path = entry.path();
-                            if path.join("studio.db").is_file() {
-                                return Some(path);
-                            }
-                            folders.push(path);
-                        }
-                    }
-                    folders.iter().find_map(|path| find_root(path, depth - 1))
-                }
-                let Some(root) = find_root(&temp, 3) else {
-                    let names = std::fs::read_dir(&temp)
-                        .map(|entries| {
-                            entries
-                                .filter_map(|entry| entry.ok())
-                                .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        })
-                        .unwrap_or_default();
-                    anyhow::bail!(
-                        "invalid_argument:the archive does not look like a Studio data backup (extracted: {names})"
-                    );
-                };
-                root
-            };
-            std::fs::create_dir_all(&data)?;
-            let source_root = std::fs::canonicalize(&source_root)?;
-            for entry in data_entries(&source_root)? {
-                let source = source_root.join(&entry);
-                anyhow::ensure!(
-                    std::fs::canonicalize(&source)?.starts_with(&source_root),
-                    "archive entry escaped temporary folder"
-                );
-                copy_entry(&source, &data.join(entry))?;
+        let file = std::fs::File::open(&path).map_err(anyhow::Error::from)?;
+        let mut archive = zip::ZipArchive::new(file).map_err(anyhow::Error::from)?;
+        let names = (0..archive.len())
+            .map(|index| archive.by_index(index).map(|entry| entry.name().to_owned()))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(anyhow::Error::from)?;
+        let first = names
+            .iter()
+            .filter_map(|name| name.split('/').next())
+            .next()
+            .unwrap_or_default();
+        let wrapped = !first.is_empty()
+            && names
+                .iter()
+                .all(|name| name.split('/').next() == Some(first))
+            && !names.iter().any(|name| name == "studio.db");
+        let strip = if wrapped {
+            format!("{first}/")
+        } else {
+            String::new()
+        };
+        if !names
+            .iter()
+            .any(|name| name.strip_prefix(&strip) == Some("studio.db"))
+        {
+            return Err(anyhow::anyhow!(
+                "invalid_argument:the archive does not look like a Studio data backup"
+            )
+            .into());
+        }
+        std::fs::create_dir_all(&data).map_err(anyhow::Error::from)?;
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).map_err(anyhow::Error::from)?;
+            if entry.is_dir() {
+                continue;
             }
-            remove_database_sidecars(&data)?;
-            Ok(())
-        })();
-        let cleanup = std::fs::remove_dir_all(&temp);
-        result?;
-        cleanup.map_err(anyhow::Error::from)?;
+            let name = entry.name().to_owned();
+            let relative = name.strip_prefix(&strip).unwrap_or(&name);
+            let components = relative.split('/').collect::<Vec<_>>();
+            if relative.starts_with('/')
+                || relative.starts_with('\\')
+                || relative.as_bytes().get(1).is_some_and(|byte| *byte == b':')
+                || components
+                    .iter()
+                    .any(|part| part.is_empty() || *part == "..")
+            {
+                return Err(anyhow::anyhow!("invalid_argument:unsafe archive path").into());
+            }
+            let destination = components
+                .iter()
+                .fold(data.clone(), |path, part| path.join(part));
+            std::fs::create_dir_all(destination.parent().unwrap()).map_err(anyhow::Error::from)?;
+            let mut output = std::fs::File::create(destination).map_err(anyhow::Error::from)?;
+            std::io::copy(&mut entry, &mut output).map_err(anyhow::Error::from)?;
+        }
+        remove_database_sidecars(&data)?;
     } else {
         let target = data.join("auth/auth.db");
         std::fs::create_dir_all(target.parent().unwrap()).map_err(anyhow::Error::from)?;

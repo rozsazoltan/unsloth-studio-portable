@@ -47,7 +47,7 @@ fn backup_account(
         });
     }
     let Some(path) = rfd::FileDialog::new()
-        .set_file_name("auth.db")
+        .set_file_name("unsloth-studio-auth.db")
         .add_filter("SQLite database", &["db"])
         .save_file()
     else {

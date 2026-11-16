@@ -27,45 +27,8 @@ impl From<anyhow::Error> for CmdError {
 }
 type CmdResult<T> = Result<T, CmdError>;
 
-fn account_db_path(shared: &Shared) -> std::path::PathBuf {
-    std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app/auth/auth.db")
-}
-
-fn browser_profiles() -> Vec<(&'static str, std::path::PathBuf)> {
-    let Some(local) = std::env::var_os("LOCALAPPDATA") else {
-        return Vec::new();
-    };
-    [
-        ("Chrome", "Google/Chrome/User Data/Default"),
-        ("Edge", "Microsoft/Edge/User Data/Default"),
-        ("Brave", "BraveSoftware/Brave-Browser/User Data/Default"),
-        ("Vivaldi", "Vivaldi/User Data/Default"),
-        ("Opera", "Opera Software/Opera Stable"),
-    ]
-    .into_iter()
-    .map(|(name, path)| (name, std::path::PathBuf::from(&local).join(path)))
-    .collect()
-}
-
-fn ensure_browsers_closed() -> anyhow::Result<()> {
-    let output = std::process::Command::new("tasklist")
-        .args(["/FO", "CSV"])
-        .output()?;
-    anyhow::ensure!(output.status.success(), "could not check running browsers");
-    let tasks = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
-    anyhow::ensure!(
-        ![
-            "chrome.exe",
-            "msedge.exe",
-            "brave.exe",
-            "vivaldi.exe",
-            "opera.exe"
-        ]
-        .iter()
-        .any(|name| tasks.contains(&format!("\"{name}\""))),
-        "invalid_argument:Close your browser before backing up the Studio profile."
-    );
-    Ok(())
+fn studio_data_path(shared: &Shared) -> std::path::PathBuf {
+    std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app")
 }
 
 fn run_powershell(script: &str) -> anyhow::Result<()> {
@@ -76,18 +39,43 @@ fn run_powershell(script: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn copy_tree(source: &std::path::Path, destination: &std::path::Path) -> anyhow::Result<()> {
-    std::fs::create_dir_all(destination)?;
-    for entry in std::fs::read_dir(source)? {
-        let entry = entry?;
-        let target = destination.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_tree(&entry.path(), &target)?;
-        } else if entry.file_type()?.is_file() {
-            std::fs::copy(entry.path(), target)?;
+fn copy_entry(source: &std::path::Path, destination: &std::path::Path) -> anyhow::Result<()> {
+    if source.is_dir() {
+        std::fs::create_dir_all(destination)?;
+        for entry in std::fs::read_dir(source)? {
+            let entry = entry?;
+            copy_entry(&entry.path(), &destination.join(entry.file_name()))?;
         }
+    } else if source.is_file() {
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(source, destination)?;
     }
     Ok(())
+}
+
+fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
+    fn visit(path: &std::path::Path) -> anyhow::Result<()> {
+        if path.is_dir() {
+            for entry in std::fs::read_dir(path)? {
+                visit(&entry?.path())?;
+            }
+        } else if path.extension().is_some_and(|ext| ext == "db") {
+            for suffix in ["-wal", "-shm"] {
+                match std::fs::remove_file(path.with_file_name(format!(
+                    "{}{suffix}",
+                    path.file_name().unwrap().to_string_lossy()
+                ))) {
+                    Ok(()) => (),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+                    Err(error) => return Err(error.into()),
+                }
+            }
+        }
+        Ok(())
+    }
+    visit(root)
 }
 
 fn temp_folder() -> anyhow::Result<std::path::PathBuf> {
@@ -111,21 +99,26 @@ fn backup_account(
     else {
         return Ok(None);
     };
-    ensure_browsers_closed()?;
     let temp = temp_folder()?;
     let result = (|| -> anyhow::Result<()> {
-        let source = account_db_path(&s);
-        if source.exists() {
-            let auth = temp.join("auth");
-            std::fs::create_dir_all(&auth)?;
-            std::fs::copy(source, auth.join("auth.db"))?;
-        }
-        for (name, profile) in browser_profiles() {
-            for folder in ["Local Storage/leveldb", "IndexedDB"] {
-                let source = profile.join(folder);
-                if source.is_dir() {
-                    copy_tree(&source, &temp.join("browser").join(name).join(folder))?;
-                }
+        let data = studio_data_path(&s);
+        anyhow::ensure!(
+            data.join("studio.db").is_file(),
+            "invalid_argument:The Studio data folder has no studio.db"
+        );
+        for entry in [
+            "studio.db",
+            "auth",
+            "accounts",
+            "rag",
+            "assets",
+            "outputs",
+            "exports",
+            "cache",
+        ] {
+            let source = data.join(entry);
+            if source.exists() {
+                copy_entry(&source, &temp.join(entry))?;
             }
         }
         let source = temp.join("*").to_string_lossy().replace('\'', "''");
@@ -154,7 +147,7 @@ fn restore_account(
     ) {
         return Err(CmdError {
             code: "invalid_argument".into(),
-            message: "stop Studio before restoring the account".into(),
+            message: "stop Studio before restoring the data".into(),
         });
     }
     let Some(path) = rfd::FileDialog::new()
@@ -164,7 +157,7 @@ fn restore_account(
     else {
         return Ok(None);
     };
-    let target = account_db_path(&s);
+    let data = studio_data_path(&s);
     if path
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
@@ -176,57 +169,35 @@ fn restore_account(
             run_powershell(&format!(
                 "Expand-Archive -LiteralPath '{source}' -DestinationPath '{destination}' -Force"
             ))?;
-            let extracted = std::fs::canonicalize(&temp)?;
-            let browser = temp.join("browser");
-            if browser.is_dir() {
-                ensure_browsers_closed()?;
-            }
-            let db = temp.join("auth/auth.db");
-            if db.is_file() {
-                std::fs::create_dir_all(target.parent().unwrap())?;
-                std::fs::copy(db, &target)?;
-                for suffix in ["-wal", "-shm"] {
-                    match std::fs::remove_file(target.with_file_name(format!("auth.db{suffix}"))) {
-                        Ok(()) => (),
-                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
-                        Err(error) => return Err(error.into()),
-                    }
+            let marker = temp.join("studio.db");
+            anyhow::ensure!(
+                marker.is_file(),
+                "invalid_argument:the archive does not look like a Studio data backup"
+            );
+            std::fs::create_dir_all(&data)?;
+            for entry in [
+                "studio.db",
+                "auth",
+                "accounts",
+                "rag",
+                "assets",
+                "outputs",
+                "exports",
+                "cache",
+            ] {
+                let source = temp.join(entry);
+                if source.exists() {
+                    copy_entry(&source, &data.join(entry))?;
                 }
             }
-            if browser.is_dir() {
-                for entry in std::fs::read_dir(&browser)? {
-                    let entry = entry?;
-                    let name = entry.file_name().to_string_lossy().into_owned();
-                    let Some((_, profile)) = browser_profiles()
-                        .into_iter()
-                        .find(|(known, _)| *known == name)
-                    else {
-                        continue;
-                    };
-                    let subtree = std::fs::canonicalize(entry.path())?;
-                    anyhow::ensure!(
-                        subtree.starts_with(&extracted),
-                        "archive path escaped temporary folder"
-                    );
-                    for folder in ["Local Storage/leveldb", "IndexedDB"] {
-                        let source = entry.path().join(folder);
-                        if source.is_dir() {
-                            let source = std::fs::canonicalize(source)?;
-                            anyhow::ensure!(
-                                source.starts_with(&extracted),
-                                "archive path escaped temporary folder"
-                            );
-                            copy_tree(&source, &profile.join(folder))?;
-                        }
-                    }
-                }
-            }
+            remove_database_sidecars(&data)?;
             Ok(())
         })();
         let cleanup = std::fs::remove_dir_all(&temp);
         result?;
         cleanup.map_err(anyhow::Error::from)?;
     } else {
+        let target = data.join("auth/auth.db");
         std::fs::create_dir_all(target.parent().unwrap()).map_err(anyhow::Error::from)?;
         std::fs::copy(&path, &target).map_err(anyhow::Error::from)?;
         for suffix in ["-wal", "-shm"] {
@@ -260,13 +231,24 @@ fn delete_account(confirm: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResul
             message: "stop Studio before deleting the account".into(),
         });
     }
-    let target = account_db_path(&s);
-    for path in [
-        target.clone(),
-        target.with_file_name("auth.db-wal"),
-        target.with_file_name("auth.db-shm"),
+    let data = studio_data_path(&s);
+    for entry in [
+        "studio.db",
+        "auth",
+        "accounts",
+        "rag",
+        "assets",
+        "outputs",
+        "exports",
+        "cache",
     ] {
-        match std::fs::remove_file(path) {
+        let path = data.join(entry);
+        let result = if path.is_dir() {
+            std::fs::remove_dir_all(path)
+        } else {
+            std::fs::remove_file(path)
+        };
+        match result {
             Ok(()) => (),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
             Err(error) => return Err(anyhow::Error::from(error).into()),

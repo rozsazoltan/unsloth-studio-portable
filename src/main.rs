@@ -89,9 +89,16 @@ fn apply_settings(s: &Shared, settings: Settings) -> State {
             lifecycle::Phase::Absent
         };
     }
-    st.settings_path = settings::settings_path()
-        .map(|path| path.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    match settings::settings_path() {
+        Ok(path) => {
+            st.settings_exists = path.is_file();
+            st.settings_path = path.to_string_lossy().into_owned();
+        }
+        Err(_) => {
+            st.settings_exists = false;
+            st.settings_path = String::new();
+        }
+    }
     st.clone()
 }
 

@@ -360,9 +360,15 @@ export default function App() {
                     <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
                   </div>
                   <div class="overflow-port">
-                    <button class="action-button button-secondary" disabled={busy()} onClick={() => void searchLegacySettings()}>Look for an older settings file</button>
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void searchLegacySettings()}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.2" /><path d="m10 10 3.4 3.4" /></svg>
+                      <span>Look for an older settings file</span>
+                    </button>
                     <Show when={legacySettingsPath()}>
-                      <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => void migrateLegacySettings()}>Move settings here</button>
+                      <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void migrateLegacySettings()}>
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h4l1.5 1.7H14v6.3H2z" /><path d="M8 7v4m-1.5-1.5L8 11l1.5-1.5" /></svg>
+                        <span>Move settings here</span>
+                      </button>
                     </Show>
                   </div>
                   <div class="overflow-text">

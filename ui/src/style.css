@@ -88,9 +88,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .overflow-path { overflow: hidden; color: var(--faint) !important; font: var(--type-micro) var(--mono) !important; text-overflow: ellipsis; white-space: nowrap; }
 .overflow-port { display: flex; align-items: center; gap: 6px; }
 .overflow-port .text-input { flex: 1; min-width: 0; }
-.folder-keep-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--muted); font-size: var(--type-metadata); text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-.folder-keep-link:hover:not(:disabled) { color: var(--text); }
-.folder-keep-link:disabled { opacity: .5; cursor: default; }
 .overflow-check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: var(--type-metadata); cursor: pointer; }
 .overflow-check input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .toggle { position: relative; flex: none; width: 32px; height: 18px; border-radius: 999px; background: #3a3a3e; transition: background .12s ease; }

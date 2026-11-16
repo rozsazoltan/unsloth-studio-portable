@@ -108,6 +108,12 @@ jobs:
           $sdk = "${env:ProgramFiles(x86)}/Windows Kits/10/Include/10.0.26100.0"
           if (-not (Test-Path "$sdk/um/Windows.h")) { throw 'Windows SDK 10.0.26100.0 is required.' }
 
+      - name: Install Tauri CLI
+        shell: pwsh
+        run: |
+          cargo install tauri-cli --version "^2" --locked
+          if ($LASTEXITCODE -ne 0) { throw "Tauri CLI install failed with exit code $LASTEXITCODE" }
+
       - name: Build portable release binary
         shell: pwsh
         run: ./scripts/build-release.ps1

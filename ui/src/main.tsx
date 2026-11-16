@@ -382,18 +382,18 @@ export default function App() {
                 </div>
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
-                    <span class="overflow-title">Studio account</span>
+                    <span class="overflow-title">Studio config</span>
                     <p>The archive contains the Studio data folder: studio.db, auth, accounts, rag, assets, outputs, exports, and cache. Stop Studio before restoring or deleting data. The launcher’s launcher-settings.json is not included.</p>
                   </div>
                   <div class="overflow-port">
                     <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.backupAccount)}>
-                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 10v3h10v-3" /></svg><span>Back up account</span>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 10v3h10v-3" /></svg><span>Back up config</span>
                     </button>
                     <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.restoreAccount)}>
-                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg><span>Restore account</span>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg><span>Restore config</span>
                     </button>
                     <button class="text-button menu-action overflow-danger" disabled={busy()} onClick={() => { setMenuOpen(false); setRemoveText(""); setPanel("account"); }}>
-                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2" /></svg><span>Delete account</span>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2" /></svg><span>Delete config</span>
                     </button>
                   </div>
                 </div>
@@ -529,7 +529,7 @@ export default function App() {
       <Show when={panel() === "account"}>
         <section class="inline-panel remove-panel">
           <div>
-            <h2>Delete the Studio account?</h2>
+            <h2>Delete the Studio config?</h2>
             <p>This deletes studio.db, auth, accounts, rag, assets, outputs, exports, and cache from the Studio data folder. Stop Studio first. The launcher’s launcher-settings.json is not included.</p>
           </div>
           <label class="confirm-field">Type REMOVE to confirm
@@ -537,7 +537,7 @@ export default function App() {
           </label>
           <div class="inline-actions">
             <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => setPanel(null)}>Cancel</button>
-            <button class="action-button button-danger" disabled={busy() || working() || removeText() !== "REMOVE"} onClick={confirmDeleteAccount}>Delete account</button>
+            <button class="action-button button-danger" disabled={busy() || working() || removeText() !== "REMOVE"} onClick={confirmDeleteAccount}>Delete config</button>
           </div>
         </section>
       </Show>

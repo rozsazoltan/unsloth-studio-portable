@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 import { api, previewPhases, previewFailedState, previewHfLockedState, previewInstallingState, previewStartingState, previewState, type AppError, type Phase, type Settings, type State } from "./bridge";
 import { previewLogs } from "./mock";
 
-type InlinePanel = "install" | "remove" | "keep" | null;
+type InlinePanel = "install" | "remove" | "keep" | "account" | null;
 const mockMode = () => import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
 const workingPhases: Phase[] = ["installing", "starting", "stopping", "removing"];
 
@@ -323,6 +323,16 @@ export default function App() {
     setPanel(null);
     perform(() => api.remove(removeText()));
   };
+  const confirmDeleteAccount = () => {
+    setPanel(null);
+    perform(() => api.deleteAccount("REMOVE"));
+  };
+  const accountAction = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    try { const path = await action(); if (path) setRequestError(null); }
+    catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
 
   const installEnabled = () => !working() && (phase() === "absent" || phase() === "failed" || phase() === "installed");
   const updating = () => phase() === "installed";
@@ -366,6 +376,23 @@ export default function App() {
                     <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); void changeRoot(); }}>
                       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.8 2.7 2.5 2.5M3 13l2.6-.5 7.8-7.8a1.8 1.8 0 0 0-2.5-2.5L3.1 10z" /></svg>
                       <span>Change</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Studio account</span>
+                    <p>The account database lives in app\auth\auth.db. Your display name and avatar are stored by the browser, so they are not part of this file.</p>
+                  </div>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.backupAccount)}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 10v3h10v-3" /></svg><span>Back up account</span>
+                    </button>
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.restoreAccount)}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg><span>Restore account</span>
+                    </button>
+                    <button class="text-button menu-action overflow-danger" disabled={busy()} onClick={() => { setMenuOpen(false); setRemoveText(""); setPanel("account"); }}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2" /></svg><span>Delete account</span>
                     </button>
                   </div>
                 </div>
@@ -493,6 +520,22 @@ export default function App() {
             <option value="hf-locked">HF folder locked</option>
           </select>
         </label>
+      </Show>
+
+      <Show when={panel() === "account"}>
+        <section class="inline-panel remove-panel">
+          <div>
+            <h2>Delete the Studio account?</h2>
+            <p>This deletes app\auth\auth.db and its journal files. Studio will ask you to create an account again. Your install folder, models and browser profile are kept.</p>
+          </div>
+          <label class="confirm-field">Type REMOVE to confirm
+            <input value={removeText()} onInput={event => setRemoveText(event.currentTarget.value)} autocomplete="off" />
+          </label>
+          <div class="inline-actions">
+            <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => setPanel(null)}>Cancel</button>
+            <button class="action-button button-danger" disabled={busy() || working() || removeText() !== "REMOVE"} onClick={confirmDeleteAccount}>Delete account</button>
+          </div>
+        </section>
       </Show>
     <Show when={infoOpen()}>
       <div class="info-backdrop" onClick={closeInfo}>

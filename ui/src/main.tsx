@@ -357,7 +357,7 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Settings file</span>
                     <p>This file stores your chosen install folder and options. In portable mode, it lives next to the executable.</p>
-                    <Show when={current().settings_exists} fallback={<p class="overflow-path">Portable settings file was not found. It is created when you save a setting.</p>}>
+                    <Show when={current().settings_exists} fallback={<p class="overflow-path">Portable settings file was not found.</p>}>
                       <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
                     </Show>
                   </div>

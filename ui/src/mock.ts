@@ -10,6 +10,8 @@ export const previewState: State = {
     root: "C:\\Users\\you\\Unsloth Studio Desktop",
     hf_home: "C:\\Users\\you\\Unsloth Studio Desktop\\huggingface",
     port: 3000,
+    folder_name: "Unsloth Studio Desktop",
+    force_local_mise: false,
   },
   mise_config_path: "C:\\Users\\you\\Unsloth Studio Desktop\\mise.toml",
   studio_url: null,

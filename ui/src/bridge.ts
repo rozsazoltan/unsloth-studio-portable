@@ -1,5 +1,5 @@
 export type Phase = "absent" | "installing" | "installed" | "starting" | "running" | "stopping" | "removing" | "failed";
-export interface Settings { root: string; hf_home: string; port: number }
+export interface Settings { root: string; hf_home: string; port: number; folder_name: string; force_local_mise: boolean }
 export interface AppError { code: string; message: string }
 export interface State {
   phase: Phase;
@@ -23,7 +23,7 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 
 export const api = {
   getState: () => isTauri() ? invoke<State>("get_state") : Promise.resolve(previewState),
-  saveSettings: (settings: Settings) => invoke<State>("save_settings", { settings }),
+  saveSettings: (settings: Settings, moveFolder = true) => isTauri() ? invoke<State>("save_settings", { settings, move_folder: moveFolder }) : Promise.resolve({ ...previewState, settings }),
   pickDirectory: (target: "root_parent" | "hf_home") => invoke<string | null>("pick_directory", { target }),
   install: (approveEffects: boolean) => invoke<State>("install", { approve_effects: approveEffects }),
   cancel: () => isTauri() ? invoke<State>("cancel") : Promise.resolve(previewState),

@@ -11,7 +11,9 @@ Manual Unsloth installation on Windows can be difficult. This launcher keeps man
 3. Install Studio, then start or stop it from the launcher.
 4. Use launcher controls to update or uninstall Studio.
 
-Studio opens at `http://127.0.0.1:<port>`. The managed `mise.toml` lives at the product root, next to `app`. `mise` must be available on `PATH` or configured through `MISE_BIN`. Windows WebView2 Runtime is required.
+Studio opens at `http://127.0.0.1:<port>`. The managed `mise.toml` lives at the product root, next to `app`. Windows WebView2 Runtime is required.
+
+If `mise` is not available, the launcher downloads the official Windows release into `<root>\runtime\bin\mise.exe` and uses that copy by absolute path. The local copy is never added to `PATH`, so it cannot be invoked globally, and `mise self-update` refreshes only the launcher-managed binary. A system `mise` on `PATH`, or one pointed to by `MISE_BIN`, is preferred and left untouched.
 
 ## Local development
 

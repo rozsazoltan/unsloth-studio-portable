@@ -15,11 +15,11 @@ struct CmdError {
 impl From<anyhow::Error> for CmdError {
     fn from(e: anyhow::Error) -> Self {
         let m = e.to_string();
-        let code = match m.as_str() {
+        let code = match m.split(':').next().unwrap_or_default() {
             "operation_in_progress"
             | "approval_required"
             | "confirm_required"
-            | "invalid_argument" => m.clone(),
+            | "invalid_argument" => m.split(':').next().unwrap_or_default().to_string(),
             _ => "internal".to_string(),
         };
         Self { code, message: m }
@@ -33,13 +33,32 @@ fn get_state(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn save_settings(settings: Settings, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+fn save_settings(
+    mut settings: Settings,
+    move_folder: bool,
+    s: tauri::State<'_, Arc<Shared>>,
+) -> CmdResult<State> {
     if settings.root.trim().is_empty() || settings.hf_home.trim().is_empty() {
         return Err(CmdError {
             code: "invalid_argument".into(),
             message: "root and hugging face folder are required".into(),
         });
     }
+    // Moving the product folder while an operation owns it would break the
+    // running child, so only a changed root or name is rejected here.
+    {
+        let current = s.state.lock().unwrap();
+        let folder_changed = settings.root != current.settings.root
+            || settings.normalized_folder_name() != current.settings.normalized_folder_name();
+        drop(current);
+        if folder_changed && s.operation.lock().unwrap().is_some() {
+            return Err(CmdError {
+                code: "operation_in_progress".into(),
+                message: "The install folder cannot be changed while an operation is running. Wait for it to finish and try again.".into(),
+            });
+        }
+    }
+    settings.apply_folder_name(move_folder)?;
     settings.save()?;
     let mut st = s.state.lock().unwrap();
     st.settings = settings;
@@ -50,9 +69,15 @@ fn save_settings(settings: Settings, s: tauri::State<'_, Arc<Shared>>) -> CmdRes
         .join("mise.toml")
         .to_string_lossy()
         .into();
-    if matches!(
+    // Any settings change can move the product root, so re-check the install
+    // state. Only live operations and a running Studio keep their phase.
+    if !matches!(
         st.phase,
-        lifecycle::Phase::Absent | lifecycle::Phase::Installed
+        lifecycle::Phase::Installing
+            | lifecycle::Phase::Starting
+            | lifecycle::Phase::Running
+            | lifecycle::Phase::Stopping
+            | lifecycle::Phase::Removing
     ) {
         st.phase = if lifecycle::is_installed(&st.settings) {
             lifecycle::Phase::Installed
@@ -110,7 +135,7 @@ fn stop(app: tauri::AppHandle, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<St
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn remove(
+async fn remove(
     confirm: String,
     app: tauri::AppHandle,
     s: tauri::State<'_, Arc<Shared>>,
@@ -121,7 +146,16 @@ fn remove(
             message: "type REMOVE to confirm".into(),
         });
     }
-    lifecycle::remove(&app, &s).map_err(Into::into)
+    // Deleting a full install takes seconds to minutes; keep it off the event
+    // thread so the window stays responsive.
+    let shared = s.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || lifecycle::remove(&app, &shared))
+        .await
+        .map_err(|error| CmdError {
+            code: "internal".into(),
+            message: error.to_string(),
+        })?
+        .map_err(Into::into)
 }
 
 #[tauri::command(rename_all = "snake_case")]

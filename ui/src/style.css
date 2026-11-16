@@ -19,6 +19,12 @@
 }
 
 * { box-sizing: border-box; }
+* { scrollbar-width: thin; scrollbar-color: #2a2a2e transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #2a2a2e; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: #343438; }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { min-width: 320px; min-height: 480px; background: var(--bg); font-size: 13px; }
 button, input, select { font: inherit; color: inherit; }
@@ -74,7 +80,17 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .info-section a { color: #c7c7cb; text-decoration: underline; text-decoration-color: #55555a; text-underline-offset: 2px; }
 .info-section a:hover { color: var(--text); text-decoration-color: currentColor; }
 .overflow { position: relative; display: flex; margin-left: 7px; }
-.overflow-menu { position: absolute; top: calc(100% + 8px); left: 0; right: auto; z-index: 9; display: flex; flex-direction: column; gap: 14px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); overflow-y: auto; padding: 14px 16px; border: 1px solid #343438; border-radius: 8px; background: var(--panel); }
+.overflow-menu { position: absolute; top: calc(100% + 8px); left: 0; right: auto; z-index: 9; display: flex; flex-direction: column; gap: 14px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); min-width: 0; overflow-x: hidden; overflow-y: auto; padding: 14px 16px; border: 1px solid #343438; border-radius: 8px; background: var(--panel); }
+.general-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px 18px; min-width: 0; }
+.general-settings > *, .experimental-settings > * { min-width: 0; }
+.general-settings .overflow-row { min-width: 0; }
+.overflow-port { flex-wrap: wrap; min-width: 0; }
+.overflow-port .menu-action { min-width: 0; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+.menu-action span { min-width: 0; overflow-wrap: anywhere; }
+.root-path { max-width: 100%; }
+.overflow-text p { overflow-wrap: anywhere; }
+.settings-menu-wide { grid-column: 1 / -1; }
+.experimental-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .overflow-tabs { display: flex; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .overflow-tab { padding: 3px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font: inherit; font-size: var(--type-metadata); cursor: pointer; }
 .overflow-tab:hover { color: var(--text); }
@@ -193,6 +209,11 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .footer-link:hover { color: var(--text); text-decoration: underline; }
 .footer-star svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
 @media (prefers-reduced-motion: reduce) { .progress-sweep { animation: none; left: 0; width: 100%; opacity: .45; } }
+
+@media (min-width: 1180px) {
+  .overflow-menu:has(.general-settings) { width: min(660px, calc(100vw - 32px)); }
+  .general-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .phase-picker { position: fixed; right: 12px; bottom: 52px; display: flex; align-items: center; gap: 7px; color: var(--faint); font: 9px var(--mono); letter-spacing: .05em; }
 .phase-picker select { max-width: 110px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--muted); font: 10px var(--mono); }

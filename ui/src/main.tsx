@@ -366,6 +366,7 @@ export default function App() {
                 <button class={menuTab() === "experimental" ? "overflow-tab active" : "overflow-tab"} role="tab" aria-selected={menuTab() === "experimental"} onClick={() => setMenuTab("experimental")}>Experimental</button>
               </div>
               <Show when={menuTab() === "general"}>
+                <div class="general-settings">
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder</span>
@@ -396,7 +397,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <div class="overflow-row overflow-row-stack">
+                <div class="overflow-row overflow-row-stack settings-menu-wide">
                   <div class="overflow-text">
                     <span class="overflow-title">Settings file</span>
                     <p>This file stores your chosen install folder and options. It lives in the install folder; a small pointer next to the executable records which folder is active.</p>
@@ -468,8 +469,10 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+                </div>
               </Show>
               <Show when={menuTab() === "experimental"}>
+                <div class="experimental-settings">
                 <div class="overflow-text">
                   <p>Unstable options. Leave them off unless you know you need them.</p>
                 </div>
@@ -495,6 +498,7 @@ export default function App() {
                     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h4l1.3 1.6h5.7v7h-11z" /><path d="M8 8.4v3M6.5 9.9h3" /></svg>
                     <span>Keep the old folder and install somewhere else?</span>
                   </button>
+                </div>
                 </div>
               </Show>
             </div>

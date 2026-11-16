@@ -238,8 +238,83 @@ pub fn environment(c: &mut Command, s: &Settings) -> Result<()> {
     }
     Ok(())
 }
-fn mise() -> Command {
-    Command::new(std::env::var_os("MISE_BIN").unwrap_or_else(|| std::ffi::OsString::from("mise")))
+fn mise(settings: &Settings) -> Command {
+    if let Some(bin) = std::env::var_os("MISE_BIN") {
+        return Command::new(bin);
+    }
+    let local = PathBuf::from(&settings.root).join("runtime/bin/mise.exe");
+    if local.is_file() {
+        return Command::new(local);
+    }
+    Command::new("mise")
+}
+
+fn local_mise(settings: &Settings) -> PathBuf {
+    PathBuf::from(&settings.root).join("runtime/bin/mise.exe")
+}
+
+/// Make sure a mise binary is usable. A machine-wide install is preferred; when
+/// none is found, the official Windows release is downloaded into the product
+/// root. That copy is only ever invoked by absolute path, never added to PATH,
+/// so it cannot be reached globally.
+fn ensure_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
+    let mut probe = mise(settings);
+    probe.arg("--version");
+    if run(app, &mut probe, settings).is_ok() {
+        return self_update_mise(app, settings);
+    }
+    if std::env::var_os("MISE_BIN").is_some() {
+        bail!("mise is not usable at MISE_BIN");
+    }
+    emit_log(
+        app,
+        "mise was not found; downloading a local copy into the product folder.",
+    );
+    let bin_dir = PathBuf::from(&settings.root).join("runtime/bin");
+    fs::create_dir_all(&bin_dir)?;
+    let dest = bin_dir.join("mise.exe");
+    let script = format!(
+        "$ErrorActionPreference='Stop'; \
+         [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; \
+         $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/jdx/mise/releases/latest' -Headers @{{'User-Agent'='unsloth-studio-portable'}}; \
+         $asset = $release.assets | Where-Object {{ $_.name -like '*windows-x64.exe' }} | Select-Object -First 1; \
+         if (-not $asset) {{ throw 'mise windows-x64 asset not found' }}; \
+         Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '{}' -UseBasicParsing",
+        dest.display()
+    );
+    let mut download = Command::new("powershell");
+    download.args([
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        &script,
+    ]);
+    run(app, &mut download, settings)?;
+    if !dest.is_file() {
+        bail!("mise download did not produce a binary");
+    }
+    let mut verify = mise(settings);
+    verify.arg("--version");
+    run(app, &mut verify, settings)?;
+    self_update_mise(app, settings)
+}
+
+/// Refresh only the launcher-managed copy. A mise already provided by the user
+/// is left alone, and failures are logged rather than aborting an install.
+fn self_update_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
+    if std::env::var_os("MISE_BIN").is_some() || !local_mise(settings).is_file() {
+        return Ok(());
+    }
+    let mut update = mise(settings);
+    update.arg("self-update");
+    if let Err(error) = run(app, &mut update, settings) {
+        emit_log(
+            app,
+            &format!("Note: mise self-update failed and was skipped: {error}"),
+        );
+    }
+    Ok(())
 }
 fn run(app: &AppHandle, cmd: &mut Command, settings: &Settings) -> Result<()> {
     environment(cmd, settings)?;
@@ -446,11 +521,12 @@ fn install_blocking(app: &AppHandle, shared: &Shared) -> Result<State> {
         )?;
     }
     set_step(app, shared, 4, 6, "Installing tools");
-    run(app, mise().arg("--cd").arg(&root).arg("install"), &s)?;
+    ensure_mise(app, &s)?;
+    run(app, mise(&s).arg("--cd").arg(&root).arg("install"), &s)?;
     set_step(app, shared, 5, 6, "Running Studio setup");
     run(
         app,
-        mise()
+        mise(&s)
             .arg("--cd")
             .arg(&root)
             .args([
@@ -503,7 +579,7 @@ pub fn launch(app: &AppHandle, shared: &Arc<Shared>) -> Result<State> {
         emit(app, &state);
         let root = PathBuf::from(&state.settings.root);
         let python = root.join("app/unsloth_studio/Scripts/python.exe");
-        let mut command = mise();
+        let mut command = mise(&state.settings);
         command
             .arg("--cd")
             .arg(&root)

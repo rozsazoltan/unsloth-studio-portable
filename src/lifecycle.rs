@@ -62,6 +62,8 @@ pub struct State {
     pub phase: Phase,
     pub settings: Settings,
     pub mise_config_path: String,
+    pub settings_path: String,
+    pub settings_exists: bool,
     pub studio_url: Option<String>,
     pub last_error: Option<ErrorInfo>,
     pub hf_env_var: Option<String>,
@@ -86,7 +88,12 @@ impl State {
         } else {
             Phase::Absent
         };
+        let settings_path = crate::settings::settings_path().ok();
         Self {
+            settings_exists: settings_path.as_ref().is_some_and(|path| path.is_file()),
+            settings_path: settings_path
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             mise_config_path: PathBuf::from(&settings.root)
                 .join("mise.toml")
                 .to_string_lossy()

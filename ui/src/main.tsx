@@ -13,6 +13,8 @@ export default function App() {
   const [removeText, setRemoveText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [requestError, setRequestError] = createSignal<AppError | null>(null);
+  const [legacySettingsPath, setLegacySettingsPath] = createSignal<string | null>(null);
+  const [legacySearchComplete, setLegacySearchComplete] = createSignal(false);
   const [version, setVersion] = createSignal("dev");
   const [followingOutput, setFollowingOutput] = createSignal(true);
   const [clock, setClock] = createSignal(Date.now() / 1000);
@@ -169,6 +171,47 @@ export default function App() {
       setBusy(false);
     }
   };
+  const searchLegacySettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      setLegacySettingsPath(await api.findLegacySettings());
+      setLegacySearchComplete(true);
+    } catch (error) {
+      setRequestError(toAppError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const migrateLegacySettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      setState(await api.migrateSettings());
+      setLegacySettingsPath(null);
+      setLegacySearchComplete(false);
+    } catch (error) {
+      setRequestError(toAppError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const exportSettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try { await api.exportSettings(); }
+    catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
+  const importSettings = async () => {
+    setBusy(true);
+    setRequestError(null);
+    try {
+      const next = await api.importSettings();
+      if (next) setState(next);
+    } catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
 
   const guardRunning = () => {
     if (!working()) return false;
@@ -204,7 +247,7 @@ export default function App() {
     }
   };
 
-  const revealPath = (target: "root" | "mise_config" | "hf_home") => {
+  const revealPath = (target: "root" | "mise_config" | "hf_home" | "settings") => {
     api.revealPath(target).catch(error => setRequestError(toAppError(error)));
   };
 
@@ -317,13 +360,60 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder</span>
                     <p>Choose where Unsloth Studio and its managed tools are installed. An existing installation in the selected folder is detected automatically; use Update to move it forward instead of reinstalling.</p>
-                    <p class="overflow-path">{current().settings.root}</p>
+                    <button class="root-path" title={current().settings.root} onClick={() => revealPath("root")}>{current().settings.root}</button>
                   </div>
                   <div class="overflow-port">
                     <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); void changeRoot(); }}>
                       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.8 2.7 2.5 2.5M3 13l2.6-.5 7.8-7.8a1.8 1.8 0 0 0-2.5-2.5L3.1 10z" /></svg>
                       <span>Change</span>
                     </button>
+                  </div>
+                </div>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Settings file</span>
+                    <p>This file stores your chosen install folder and options. It lives in the install folder; a small pointer next to the executable records which folder is active.</p>
+                    <Show when={current().settings_exists} fallback={<p class="overflow-path">Portable settings file was not found.</p>}>
+                      <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
+                    </Show>
+                  </div>
+                  <Show when={legacySettingsPath()}>
+                    <div class="overflow-text">
+                      <button class="root-path" title={legacySettingsPath()} onClick={() => revealPath("legacy_settings")}>{legacySettingsPath()}</button>
+                      <p>The file will be moved, not copied.</p>
+                    </div>
+                  </Show>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void exportSettings()}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg>
+                      <span>Export settings</span>
+                    </button>
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void importSettings()}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 6v8m-3-3 3 3 3-3M3 7V3h10v4" /></svg>
+                      <span>Import settings</span>
+                    </button>
+                  </div>
+                  <div class="overflow-port">
+                    <Show when={!legacySearchComplete()}>
+                      <button class="text-button menu-action" disabled={busy()} onClick={() => void searchLegacySettings()}>
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.2" /><path d="m10 10 3.4 3.4" /></svg>
+                        <span>Look for an older settings file</span>
+                      </button>
+                    </Show>
+                    <Show when={legacySettingsPath()}>
+                      <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void migrateLegacySettings()}>
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h4l1.5 1.7H14v6.3H2z" /><path d="M8 7v4m-1.5-1.5L8 11l1.5-1.5" /></svg>
+                        <span>Move settings here</span>
+                      </button>
+                    </Show>
+                  </div>
+                  <div class="overflow-text">
+                    <Show when={busy() && !legacySearchComplete()}>
+                      <p>Looking for an older settings file…</p>
+                    </Show>
+                    <Show when={legacySearchComplete() && !legacySettingsPath()}>
+                      <p class="overflow-danger">No settings file was found in the original location.</p>
+                    </Show>
                   </div>
                 </div>
                 <div class="overflow-row overflow-row-stack">
@@ -365,7 +455,7 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder name</span>
                     <p>Renames the product folder inside its current parent folder. Leave it empty to use the default name.</p>
-                    <p class="overflow-path">{current().settings.root}</p>
+                    <button class="root-path" title={current().settings.root} onClick={() => revealPath("root")}>{current().settings.root}</button>
                   </div>
                   <div class="overflow-port">
                     <input class="text-input" type="text" placeholder="Unsloth Studio Desktop" value={folderText()} disabled={busy()} onInput={event => setFolderText(event.currentTarget.value)} />
@@ -374,8 +464,9 @@ export default function App() {
                       <span>Save</span>
                     </button>
                   </div>
-                  <button class="text-button folder-keep-link" disabled={busy()} onClick={() => { setMenuOpen(false); setPanel("keep"); }}>
-                    Keep the old folder and install somewhere else?
+                  <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); setPanel("keep"); }}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h4l1.3 1.6h5.7v7h-11z" /><path d="M8 8.4v3M6.5 9.9h3" /></svg>
+                    <span>Keep the old folder and install somewhere else?</span>
                   </button>
                 </div>
               </Show>

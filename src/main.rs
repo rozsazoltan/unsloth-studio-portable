@@ -60,6 +60,10 @@ fn save_settings(
     }
     settings.apply_folder_name(move_folder)?;
     settings.save()?;
+    Ok(apply_settings(&s, settings))
+}
+
+fn apply_settings(s: &Shared, settings: Settings) -> State {
     let mut st = s.state.lock().unwrap();
     st.settings = settings;
     let (hf_env_var, hf_home) = lifecycle::effective_hf_home(&st.settings.hf_home);
@@ -85,7 +89,116 @@ fn save_settings(
             lifecycle::Phase::Absent
         };
     }
-    Ok(st.clone())
+    match settings::settings_path() {
+        Ok(path) => {
+            st.settings_exists = path.is_file();
+            st.settings_path = path.to_string_lossy().into_owned();
+        }
+        Err(_) => {
+            st.settings_exists = false;
+            st.settings_path = String::new();
+        }
+    }
+    st.clone()
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn find_legacy_settings() -> CmdResult<Option<String>> {
+    let active = settings::settings_path()?;
+    Ok(settings::legacy_path()
+        .filter(|path| path != &active)
+        .map(|path| path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn migrate_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "The settings file cannot be migrated while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let legacy = settings::legacy_path().ok_or_else(|| CmdError {
+        code: "invalid_argument".into(),
+        message: "No settings file was found in the default location.".into(),
+    })?;
+    let target = settings::settings_path()?;
+    if target.exists() {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: format!(
+                "A settings file already exists at {}. It was not overwritten.",
+                target.display()
+            ),
+        });
+    }
+    std::fs::create_dir_all(target.parent().ok_or_else(|| CmdError {
+        code: "internal".into(),
+        message: "settings path has no parent".into(),
+    })?)
+    .map_err(anyhow::Error::from)?;
+    if let Err(rename_error) = std::fs::rename(&legacy, &target) {
+        if let Err(copy_error) = std::fs::copy(&legacy, &target) {
+            return Err(CmdError {
+                code: "internal".into(),
+                message: format!("{rename_error}; fallback copy failed: {copy_error}"),
+            });
+        }
+        std::fs::remove_file(&legacy).map_err(anyhow::Error::from)?;
+    }
+    let settings = Settings::load_or_default()?;
+    Ok(apply_settings(&s, settings))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn export_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "Settings cannot be exported while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .set_file_name("launcher-settings.json")
+        .add_filter("JSON", &["json"])
+        .save_file()
+    else {
+        return Ok(None);
+    };
+    let settings = s.state.lock().unwrap().settings.clone();
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&settings).map_err(anyhow::Error::from)?,
+    )
+    .map_err(anyhow::Error::from)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn import_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<State>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError {
+            code: "operation_in_progress".into(),
+            message: "Settings cannot be imported while an operation is running. Wait for it to finish and try again.".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+    let settings: Settings =
+        serde_json::from_slice(&std::fs::read(path).map_err(anyhow::Error::from)?)
+            .map_err(anyhow::Error::from)?;
+    if settings.root.trim().is_empty() || settings.hf_home.trim().is_empty() {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "root and hugging face folder are required".into(),
+        });
+    }
+    settings.save()?;
+    Ok(Some(apply_settings(&s, settings)))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -190,6 +303,14 @@ fn reveal_path(target: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<()
         "root" => std::path::PathBuf::from(&st.settings.root),
         "mise_config" => std::path::PathBuf::from(&st.mise_config_path),
         "hf_home" => std::path::PathBuf::from(&st.settings.hf_home),
+        "settings" => crate::settings::settings_path().map_err(|e| CmdError {
+            code: "internal".into(),
+            message: e.to_string(),
+        })?,
+        "legacy_settings" => crate::settings::legacy_path().ok_or_else(|| CmdError {
+            code: "invalid_argument".into(),
+            message: "no legacy settings file".into(),
+        })?,
         _ => {
             return Err(CmdError {
                 code: "invalid_argument".into(),
@@ -261,6 +382,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_state,
             save_settings,
+            find_legacy_settings,
+            migrate_settings,
+            export_settings,
+            import_settings,
             pick_directory,
             install,
             cancel_install,

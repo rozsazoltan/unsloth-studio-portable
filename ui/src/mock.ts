@@ -14,6 +14,8 @@ export const previewState: State = {
     force_local_mise: false,
   },
   mise_config_path: "C:\\Users\\you\\Unsloth Studio Desktop\\mise.toml",
+  settings_path: "C:\\Users\\you\\AppData\\Local\\Unsloth Studio Desktop\\launcher-settings.json",
+  settings_exists: true,
   studio_url: null,
   last_error: null,
 };

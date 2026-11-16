@@ -5,6 +5,8 @@ export interface State {
   phase: Phase;
   settings: Settings;
   mise_config_path: string;
+  settings_path: string;
+  settings_exists: boolean;
   studio_url: string | null;
   last_error: AppError | null;
   hf_env_var?: string | null;
@@ -26,12 +28,16 @@ export const api = {
   saveSettings: (settings: Settings, moveFolder = true) => isTauri() ? invoke<State>("save_settings", { settings, move_folder: moveFolder }) : Promise.resolve({ ...previewState, settings }),
   pickDirectory: (target: "root_parent" | "hf_home") => invoke<string | null>("pick_directory", { target }),
   install: (approveEffects: boolean) => invoke<State>("install", { approve_effects: approveEffects }),
+  findLegacySettings: () => isTauri() ? invoke<string | null>("find_legacy_settings") : Promise.resolve(null),
+  migrateSettings: () => isTauri() ? invoke<State>("migrate_settings") : Promise.resolve(previewState),
+  exportSettings: () => isTauri() ? invoke<string | null>("export_settings") : Promise.resolve(null),
+  importSettings: () => isTauri() ? invoke<State | null>("import_settings") : Promise.resolve(null),
   cancel: () => isTauri() ? invoke<State>("cancel") : Promise.resolve(previewState),
   start: () => invoke<State>("start"),
   stop: () => invoke<State>("stop"),
   remove: (confirm: string) => invoke<State>("remove", { confirm }),
   openStudio: () => invoke<void>("open_studio"),
-  revealPath: (target: "root" | "mise_config" | "hf_home") =>
+  revealPath: (target: "root" | "mise_config" | "hf_home" | "settings" | "legacy_settings") =>
     isTauri() ? invoke<void>("reveal_path", { target }) : Promise.resolve(),
   probeStudio: () => isTauri() ? invoke<boolean>("probe_studio") : Promise.resolve(true),
   openUrl: (url: string) => isTauri() ? invoke<void>("open_url", { url }) : Promise.resolve(),

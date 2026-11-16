@@ -6,6 +6,7 @@ export interface State {
   settings: Settings;
   mise_config_path: string;
   settings_path: string;
+  settings_exists: boolean;
   studio_url: string | null;
   last_error: AppError | null;
   hf_env_var?: string | null;
@@ -34,7 +35,7 @@ export const api = {
   stop: () => invoke<State>("stop"),
   remove: (confirm: string) => invoke<State>("remove", { confirm }),
   openStudio: () => invoke<void>("open_studio"),
-  revealPath: (target: "root" | "mise_config" | "hf_home" | "settings") =>
+  revealPath: (target: "root" | "mise_config" | "hf_home" | "settings" | "legacy_settings") =>
     isTauri() ? invoke<void>("reveal_path", { target }) : Promise.resolve(),
   probeStudio: () => isTauri() ? invoke<boolean>("probe_studio") : Promise.resolve(true),
   openUrl: (url: string) => isTauri() ? invoke<void>("open_url", { url }) : Promise.resolve(),

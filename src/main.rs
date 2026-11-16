@@ -249,6 +249,10 @@ fn reveal_path(target: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<()
             code: "internal".into(),
             message: e.to_string(),
         })?,
+        "legacy_settings" => crate::settings::legacy_path().ok_or_else(|| CmdError {
+            code: "invalid_argument".into(),
+            message: "no legacy settings file".into(),
+        })?,
         _ => {
             return Err(CmdError {
                 code: "invalid_argument".into(),

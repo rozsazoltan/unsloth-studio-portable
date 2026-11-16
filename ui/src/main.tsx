@@ -383,7 +383,7 @@ export default function App() {
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
                     <span class="overflow-title">Studio account</span>
-                    <p>The account database lives in app\auth\auth.db. Your display name and avatar are stored by the browser, so they are not part of this file.</p>
+                    <p>Backup creates one zip with app\auth\auth.db and browser profile folders for the Studio origin. Close your browser first. Deleting the account does not clear browser profile data; clear site data for 127.0.0.1:8888 in your browser.</p>
                   </div>
                   <div class="overflow-port">
                     <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.backupAccount)}>
@@ -530,7 +530,7 @@ export default function App() {
         <section class="inline-panel remove-panel">
           <div>
             <h2>Delete the Studio account?</h2>
-            <p>This deletes app\auth\auth.db and its journal files. Studio will ask you to create an account again. Your install folder, models and browser profile are kept.</p>
+            <p>This deletes app\auth\auth.db and its journal files. Studio will ask you to create an account again. Browser profile data is not deleted; clear site data for 127.0.0.1:8888 in your browser.</p>
           </div>
           <label class="confirm-field">Type REMOVE to confirm
             <input value={removeText()} onInput={event => setRemoveText(event.currentTarget.value)} autocomplete="off" />

@@ -237,7 +237,7 @@ fn restore_account(
             let source = path.to_string_lossy().replace('\'', "''");
             let destination = temp.to_string_lossy().replace('\'', "''");
             run_powershell(&format!(
-                "Expand-Archive -LiteralPath '{source}' -DestinationPath '{destination}' -Force"
+                "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('{source}', '{destination}')"
             ))?;
             let source_root = if temp.join("studio.db").is_file() {
                 temp.clone()
@@ -259,8 +259,17 @@ fn restore_account(
                     folders.iter().find_map(|path| find_root(path, depth - 1))
                 }
                 let Some(root) = find_root(&temp, 3) else {
+                    let names = std::fs::read_dir(&temp)
+                        .map(|entries| {
+                            entries
+                                .filter_map(|entry| entry.ok())
+                                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .unwrap_or_default();
                     anyhow::bail!(
-                        "invalid_argument:the archive does not look like a Studio data backup"
+                        "invalid_argument:the archive does not look like a Studio data backup (extracted: {names})"
                     );
                 };
                 root

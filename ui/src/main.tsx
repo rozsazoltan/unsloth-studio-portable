@@ -361,6 +361,12 @@ export default function App() {
                       <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
                     </Show>
                   </div>
+                  <Show when={legacySettingsPath()}>
+                    <div class="overflow-text">
+                      <button class="root-path" title={legacySettingsPath()} onClick={() => revealPath("legacy_settings")}>{legacySettingsPath()}</button>
+                      <p>The file will be moved, not copied.</p>
+                    </div>
+                  </Show>
                   <div class="overflow-port">
                     <Show when={!legacySearchComplete()}>
                       <button class="text-button menu-action" disabled={busy()} onClick={() => void searchLegacySettings()}>
@@ -381,10 +387,6 @@ export default function App() {
                     </Show>
                     <Show when={legacySearchComplete() && !legacySettingsPath()}>
                       <p class="overflow-danger">No settings file was found in the original location.</p>
-                    </Show>
-                    <Show when={legacySettingsPath()}>
-                      <button class="root-path" title={legacySettingsPath()} onClick={() => revealPath("legacy_settings")}>{legacySettingsPath()}</button>
-                      <p>The file will be moved, not copied.</p>
                     </Show>
                   </div>
                 </div>

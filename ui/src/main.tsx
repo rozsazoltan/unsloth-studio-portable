@@ -231,7 +231,7 @@ export default function App() {
     }
   };
 
-  const revealPath = (target: "root" | "mise_config" | "hf_home") => {
+  const revealPath = (target: "root" | "mise_config" | "hf_home" | "settings") => {
     api.revealPath(target).catch(error => setRequestError(toAppError(error)));
   };
 
@@ -357,21 +357,24 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Settings file</span>
                     <p>This file stores your chosen install folder and options. In portable mode, it lives next to the executable.</p>
+                    <button class="root-path settings-file-path" title={current().settings_path} onClick={() => revealPath("settings")}>{current().settings_path}</button>
                   </div>
-                  <p class="overflow-path">{current().settings_path}</p>
-                </div>
-                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-port">
+                    <button class="action-button button-secondary" disabled={busy()} onClick={() => void searchLegacySettings()}>Look for an older settings file</button>
+                    <Show when={legacySettingsPath()}>
+                      <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => void migrateLegacySettings()}>Move settings here</button>
+                    </Show>
+                  </div>
                   <div class="overflow-text">
-                    <button class="text-button folder-keep-link" disabled={busy()} onClick={() => void searchLegacySettings()}>Search the default location</button>
+                    <Show when={busy() && !legacySearchComplete()}>
+                      <p>Looking for an older settings file…</p>
+                    </Show>
                     <Show when={legacySearchComplete() && !legacySettingsPath()}>
-                      <p>No settings file was found in the default location.</p>
+                      <p>No older settings file was found.</p>
                     </Show>
                     <Show when={legacySettingsPath()}>
                       <p class="overflow-path">{legacySettingsPath()}</p>
-                      <div class="overflow-port">
-                        <button class="text-button menu-action" disabled={busy()} onClick={() => void migrateLegacySettings()}>Move settings here</button>
-                      </div>
-                      <p>The file is moved, not copied.</p>
+                      <p>The file will be moved, not copied.</p>
                     </Show>
                   </div>
                 </div>

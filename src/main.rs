@@ -245,6 +245,10 @@ fn reveal_path(target: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<()
         "root" => std::path::PathBuf::from(&st.settings.root),
         "mise_config" => std::path::PathBuf::from(&st.mise_config_path),
         "hf_home" => std::path::PathBuf::from(&st.settings.hf_home),
+        "settings" => crate::settings::settings_path().map_err(|e| CmdError {
+            code: "internal".into(),
+            message: e.to_string(),
+        })?,
         _ => {
             return Err(CmdError {
                 code: "invalid_argument".into(),
@@ -253,6 +257,16 @@ fn reveal_path(target: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<()
         }
     };
     let exists = path.exists();
+    if target == "settings" {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", path.display()))
+            .spawn()
+            .map_err(|e| CmdError {
+                code: "internal".into(),
+                message: e.to_string(),
+            })?;
+        return Ok(());
+    }
     let result = if exists && path.is_file() {
         tauri_plugin_opener::reveal_item_in_dir(&path)
     } else {

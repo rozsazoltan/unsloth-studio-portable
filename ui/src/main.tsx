@@ -328,6 +328,13 @@ export default function App() {
                 </div>
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
+                    <span class="overflow-title">Settings file</span>
+                    <p>This file stores your chosen install folder and options. In portable mode, it lives next to the executable.</p>
+                  </div>
+                  <p class="overflow-path">{current().settings_path}</p>
+                </div>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
                     <span class="overflow-title">Studio port</span>
                     <p>Local port used by the Studio web interface. Change it only when another program already uses the current port.</p>
                   </div>

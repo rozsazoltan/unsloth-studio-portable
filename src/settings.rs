@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::OnceLock};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -66,7 +66,7 @@ impl Settings {
     }
 
     pub fn load_or_default() -> Result<Self> {
-        let path = config_path()?;
+        let path = settings_path()?;
         if path.exists() {
             Ok(serde_json::from_slice(&fs::read(path)?)?)
         } else {
@@ -74,18 +74,37 @@ impl Settings {
         }
     }
     pub fn save(&self) -> Result<()> {
-        let path = config_path()?;
+        let path = settings_path()?;
         fs::create_dir_all(path.parent().context("settings path has no parent")?)?;
         fs::write(path, serde_json::to_vec_pretty(self)?)?;
         Ok(())
     }
 }
 
-fn config_path() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        std::env::var_os("LOCALAPPDATA")
-            .or_else(|| std::env::var_os("USERPROFILE"))
-            .context("missing user directory")?,
-    )
-    .join("Unsloth Studio Desktop/launcher-settings.json"))
+pub fn settings_path() -> Result<PathBuf> {
+    static PATH: OnceLock<PathBuf> = OnceLock::new();
+    if let Some(path) = PATH.get() {
+        return Ok(path.clone());
+    }
+    let fallback = || -> Result<PathBuf> {
+        Ok(PathBuf::from(
+            std::env::var_os("LOCALAPPDATA")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .context("missing user directory")?,
+        )
+        .join("Unsloth Studio Desktop/launcher-settings.json"))
+    };
+    let path = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(PathBuf::from))
+        .and_then(|directory| {
+            let probe = directory.join(".unsloth-settings-probe");
+            fs::write(&probe, [])
+                .and_then(|()| fs::remove_file(probe))
+                .ok()
+                .map(|()| directory.join("launcher-settings.json"))
+        })
+        .map_or_else(fallback, Ok)?;
+    let _ = PATH.set(path.clone());
+    Ok(PATH.get().cloned().unwrap_or(path))
 }

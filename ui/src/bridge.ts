@@ -5,6 +5,7 @@ export interface State {
   phase: Phase;
   settings: Settings;
   mise_config_path: string;
+  settings_path: string;
   studio_url: string | null;
   last_error: AppError | null;
   hf_env_var?: string | null;

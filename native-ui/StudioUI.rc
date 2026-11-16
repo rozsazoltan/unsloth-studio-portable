@@ -1,3 +1,0 @@
-#include "resource.h"
-
-IDI_UNSLOTH_STUDIO ICON "..\\assets\\unsloth-launcher\\icon.ico"

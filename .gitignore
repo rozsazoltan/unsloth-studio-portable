@@ -6,13 +6,11 @@ apm_modules/
 .slim/
 .planning/
 .agents/skills/
-.opencode/skills/
+.opencode/
 
 # Build output
 /target/
-/native-ui/packages/
-/native-ui/obj/
-/native-ui/x64/
-/native-ui/Generated Files/
-/native-ui/.vs/
+/gen/
+/ui/node_modules/
+/ui/dist/
 /dist/

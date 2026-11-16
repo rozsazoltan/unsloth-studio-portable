@@ -1,5 +1,8 @@
 # Native UI protocol v1
 
+> Superseded by `docs/ui-contract-v1.md` (Tauri). Kept for history only; the WinUI companion and named-pipe
+> transport described below are being removed.
+
 Rust owns settings, lifecycle, Windows integration, and destructive actions. Native UI is an original C++/WinRT WinUI 3 companion. Transport is a local Windows duplex named pipe. Rust starts the companion with `--pipe <full-pipe-name>`. A single companion connection carries requests and events. A client retries connection for at most ten seconds. Disconnect must not stop Studio. Runtime extraction and settings bootstrap may use a minimal local-app-data location before the product root is selected; disclose this exception.
 
 ## Framing and security

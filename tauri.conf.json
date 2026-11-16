@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Unsloth Studio Desktop",
+  "version": "0.1.0",
+  "identifier": "ai.datarose.unsloth-studio-desktop",
+  "build": {
+    "frontendDist": "ui/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev --port 5173 --strictPort",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [{
+      "title": "Unsloth Studio Desktop",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 880,
+      "minHeight": 600,
+      "decorations": false
+    }],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["assets/unsloth-launcher/icon.ico"]
+  }
+}

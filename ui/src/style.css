@@ -212,7 +212,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 @media (min-width: 1180px) {
   .overflow-menu:has(.general-settings) { width: min(660px, calc(100vw - 32px)); }
-  .general-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .general-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 28px; }
+  .general-settings .overflow-row + .overflow-row { padding-top: 0; border-top: 0; }
 }
 
 .phase-picker { position: fixed; right: 12px; bottom: 52px; display: flex; align-items: center; gap: 7px; color: var(--faint); font: 9px var(--mono); letter-spacing: .05em; }

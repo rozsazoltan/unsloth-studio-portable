@@ -581,6 +581,16 @@ pub fn launch(app: &AppHandle, shared: &Arc<Shared>) -> Result<State> {
         if !matches!(state.phase, Phase::Installed) {
             bail!("invalid_argument");
         }
+        // A forced local mise that is gone would fail as a spawn error and look
+        // like a hung Studio start, so say exactly what is missing.
+        if state.settings.force_local_mise && !local_mise(&state.settings).is_file() {
+            let message = format!(
+                "mise.exe was not found at {}. \"Always use a launcher-managed mise\" is on, so the launcher cannot start Studio. Install Studio again, or turn that option off in Settings, Experimental.",
+                local_mise(&state.settings).display()
+            );
+            emit_log(app, &message);
+            bail!("{message}");
+        }
         state.phase = Phase::Starting;
         begin_operation(&mut state);
         state.step = Some(Step {

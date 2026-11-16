@@ -344,7 +344,7 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder</span>
                     <p>Choose where Unsloth Studio and its managed tools are installed. An existing installation in the selected folder is detected automatically; use Update to move it forward instead of reinstalling.</p>
-                    <p class="overflow-path">{current().settings.root}</p>
+                    <button class="root-path" title={current().settings.root} onClick={() => revealPath("root")}>{current().settings.root}</button>
                   </div>
                   <div class="overflow-port">
                     <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); void changeRoot(); }}>
@@ -425,7 +425,7 @@ export default function App() {
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder name</span>
                     <p>Renames the product folder inside its current parent folder. Leave it empty to use the default name.</p>
-                    <p class="overflow-path">{current().settings.root}</p>
+                    <button class="root-path" title={current().settings.root} onClick={() => revealPath("root")}>{current().settings.root}</button>
                   </div>
                   <div class="overflow-port">
                     <input class="text-input" type="text" placeholder="Unsloth Studio Desktop" value={folderText()} disabled={busy()} onInput={event => setFolderText(event.currentTarget.value)} />
@@ -434,8 +434,9 @@ export default function App() {
                       <span>Save</span>
                     </button>
                   </div>
-                  <button class="text-button folder-keep-link" disabled={busy()} onClick={() => { setMenuOpen(false); setPanel("keep"); }}>
-                    Keep the old folder and install somewhere else?
+                  <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); setPanel("keep"); }}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h4l1.3 1.6h5.7v7h-11z" /><path d="M8 8.4v3M6.5 9.9h3" /></svg>
+                    <span>Keep the old folder and install somewhere else?</span>
                   </button>
                 </div>
               </Show>

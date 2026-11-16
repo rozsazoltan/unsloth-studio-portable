@@ -100,11 +100,20 @@ fn data_entries(root: &std::path::Path) -> anyhow::Result<Vec<std::ffi::OsString
 
 fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
     fn visit(path: &std::path::Path) -> anyhow::Result<()> {
-        let metadata = std::fs::symlink_metadata(path)?;
+        let metadata = match std::fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
         if metadata.file_type().is_symlink() {
             return Ok(());
         } else if metadata.is_dir() {
-            for entry in std::fs::read_dir(path)? {
+            let entries = match std::fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error.into()),
+            };
+            for entry in entries {
                 visit(&entry?.path())?;
             }
         } else if path.extension().is_some_and(|ext| ext == "db") {

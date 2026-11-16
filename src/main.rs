@@ -27,6 +27,40 @@ impl From<anyhow::Error> for CmdError {
 }
 type CmdResult<T> = Result<T, CmdError>;
 
+/// Filename stamp in `yyyy-mm-dd-hhmmss` (UTC) without extra crates.
+fn timestamp_suffix() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs() as i64)
+        .unwrap_or(0);
+    let (year, month, day) = civil_from_days(secs.div_euclid(86_400));
+    let rem = secs.rem_euclid(86_400);
+    format!(
+        "{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}",
+        rem / 3600,
+        (rem % 3600) / 60,
+        rem % 60
+    )
+}
+
+/// Howard Hinnant's civil_from_days: days since the Unix epoch to a date.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    (
+        if month <= 2 { year + 1 } else { year },
+        month as u32,
+        day as u32,
+    )
+}
+
 fn studio_data_path(shared: &Shared) -> std::path::PathBuf {
     std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app")
 }
@@ -138,7 +172,10 @@ fn backup_account(
         return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be backed up while an operation is running. Wait for it to finish and try again.".into() });
     }
     let Some(path) = rfd::FileDialog::new()
-        .set_file_name("unsloth-studio-settings.zip")
+        .set_file_name(format!(
+            "unsloth-studio-settings-{}.zip",
+            timestamp_suffix()
+        ))
         .add_filter("Zip archive", &["zip"])
         .save_file()
     else {
@@ -205,20 +242,27 @@ fn restore_account(
             let source_root = if temp.join("studio.db").is_file() {
                 temp.clone()
             } else {
-                let mut roots = std::fs::read_dir(&temp)?
-                    .filter_map(|entry| entry.ok())
-                    .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-                    .map(|entry| entry.path())
-                    .filter(|path| path.join("studio.db").is_file());
-                let Some(root) = roots.next() else {
+                fn find_root(dir: &std::path::Path, depth: usize) -> Option<std::path::PathBuf> {
+                    if depth == 0 {
+                        return None;
+                    }
+                    let mut folders = Vec::new();
+                    for entry in std::fs::read_dir(dir).ok()?.filter_map(|entry| entry.ok()) {
+                        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                            let path = entry.path();
+                            if path.join("studio.db").is_file() {
+                                return Some(path);
+                            }
+                            folders.push(path);
+                        }
+                    }
+                    folders.iter().find_map(|path| find_root(path, depth - 1))
+                }
+                let Some(root) = find_root(&temp, 3) else {
                     anyhow::bail!(
                         "invalid_argument:the archive does not look like a Studio data backup"
                     );
                 };
-                anyhow::ensure!(
-                    roots.next().is_none(),
-                    "invalid_argument:the archive does not look like a Studio data backup"
-                );
                 root
             };
             std::fs::create_dir_all(&data)?;
@@ -423,7 +467,7 @@ fn export_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<String>
         });
     }
     let Some(path) = rfd::FileDialog::new()
-        .set_file_name("launcher-settings.json")
+        .set_file_name(format!("launcher-settings-{}.json", timestamp_suffix()))
         .add_filter("JSON", &["json"])
         .save_file()
     else {

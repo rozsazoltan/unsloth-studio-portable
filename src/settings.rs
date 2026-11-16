@@ -38,10 +38,11 @@ impl Settings {
         }
     }
 
-    /// Rename the product folder while keeping its parent directory, move an
-    /// existing installation on disk, and rebase a Hugging Face folder that
-    /// lived inside the old root.
-    pub fn apply_folder_name(&mut self) -> Result<()> {
+    /// Rename the product folder inside the same parent directory, move an
+    /// existing installation on disk when `move_folder` is set, and rebase a
+    /// Hugging Face folder that lived inside the old root. The caller re-checks
+    /// the new path.
+    pub fn apply_folder_name(&mut self, move_folder: bool) -> Result<()> {
         let name = self.normalized_folder_name();
         let old_root = PathBuf::from(&self.root);
         self.folder_name = name.clone();
@@ -55,9 +56,9 @@ impl Settings {
                 self.hf_home = new_root.join(rest).to_string_lossy().into();
             }
         }
-        if old_root != new_root && old_root.is_dir() {
+        if move_folder && old_root != new_root && old_root.is_dir() {
             if new_root.exists() {
-                anyhow::bail!("invalid_argument: a folder with that name already exists");
+                anyhow::bail!("invalid_argument: a folder with that name already exists. Pick another name, or keep the old folder and use the new one.");
             }
             std::fs::rename(&old_root, &new_root).context("failed to rename the install folder")?;
         }

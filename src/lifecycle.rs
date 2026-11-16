@@ -276,12 +276,15 @@ fn ensure_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
     fs::create_dir_all(&bin_dir)?;
     let dest = bin_dir.join("mise.exe");
     let script = format!(
-        "$ErrorActionPreference='Stop'; \
+        "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; \
          [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; \
          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/jdx/mise/releases/latest' -Headers @{{'User-Agent'='unsloth-studio-portable'}}; \
          $asset = $release.assets | Where-Object {{ $_.name -like '*windows-x64.exe' }} | Select-Object -First 1; \
          if (-not $asset) {{ throw 'mise windows-x64 asset not found' }}; \
-         Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '{}' -UseBasicParsing",
+         $url = $asset.browser_download_url; $dest = '{}'; \
+         $curl = Join-Path $env:SystemRoot 'System32/curl.exe'; \
+         if (Test-Path $curl) {{ & $curl -L --fail --retry 3 --silent --show-error -o $dest $url; if ($LASTEXITCODE -ne 0) {{ throw 'curl download failed' }} }} \
+         else {{ Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing }}",
         dest.display()
     );
     let mut download = Command::new("powershell");
@@ -560,6 +563,13 @@ fn install_blocking(app: &AppHandle, shared: &Shared) -> Result<State> {
 }
 pub fn stop_child(shared: &Shared) -> Result<()> {
     if let Some(mut c) = shared.child.lock().unwrap().take() {
+        // The direct child is mise; Studio runs below it, so kill the whole
+        // tree or the python process keeps the port and the next start fails.
+        let _ = Command::new("taskkill")
+            .args(["/PID", &c.id().to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
         let _ = c.kill();
         let _ = c.wait();
     }
@@ -719,33 +729,27 @@ pub fn remove(app: &AppHandle, shared: &Shared) -> Result<State> {
         Ok(st.clone())
     })
 }
-// Deletion stays inside the canonicalised product root: every entry is
-// re-canonicalised, so a reparse point that resolves elsewhere is skipped.
-// mise.toml and user-data are never deleted.
+// Deletion only ever touches direct children of the canonicalised product
+// root, so nothing outside it is removed. mise.toml and user-data survive.
 pub fn safe_remove(root: &Path) -> Result<()> {
     let canonical = root.canonicalize().context("product root is missing")?;
-    fn walk(p: &Path, r: &Path) -> Result<()> {
-        for e in fs::read_dir(p)? {
-            let p = e?.path();
-            if p.file_name()
-                .is_some_and(|n| n == "mise.toml" || n == "user-data")
-            {
-                continue;
-            }
-            let Ok(c) = p.canonicalize() else {
-                continue;
-            };
-            if !c.starts_with(r) {
-                continue;
-            }
-            if c.is_dir() {
-                walk(&c, r)?;
-                fs::remove_dir(c)?
-            } else {
-                fs::remove_file(c)?
+    for e in fs::read_dir(&canonical)? {
+        let p = e?.path();
+        if p.file_name()
+            .is_some_and(|n| n == "mise.toml" || n == "user-data")
+        {
+            continue;
+        }
+        let removed = if p.is_dir() {
+            fs::remove_dir_all(&p)
+        } else {
+            fs::remove_file(&p)
+        };
+        if let Err(error) = removed {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err(error).context("failed to delete product files");
             }
         }
-        Ok(())
     }
-    walk(&canonical, &canonical)
+    Ok(())
 }

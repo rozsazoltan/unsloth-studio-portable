@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 import { api, previewPhases, previewFailedState, previewHfLockedState, previewInstallingState, previewStartingState, previewState, type AppError, type Phase, type Settings, type State } from "./bridge";
 import { previewLogs } from "./mock";
 
-type InlinePanel = "install" | "remove" | null;
+type InlinePanel = "install" | "remove" | "keep" | null;
 const mockMode = () => import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
 const workingPhases: Phase[] = ["installing", "starting", "stopping", "removing"];
 
@@ -170,7 +170,17 @@ export default function App() {
     }
   };
 
+  const guardRunning = () => {
+    if (!working()) return false;
+    setRequestError({
+      code: "operation_in_progress",
+      message: "The install folder cannot be changed while an operation is running. Wait for it to finish and try again.",
+    });
+    return true;
+  };
+
   const changeRoot = async () => {
+    if (guardRunning()) return;
     try {
       const parent = await api.pickDirectory("root_parent");
       if (!parent) return;
@@ -217,6 +227,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [folderText, setFolderText] = createSignal("");
   const [forceMise, setForceMise] = createSignal(false);
+  const [menuTab, setMenuTab] = createSignal<"general" | "experimental">("general");
   const editPort = () => {
     setPortText(String(current().settings.port));
     setPortEditing(true);
@@ -233,15 +244,29 @@ export default function App() {
     }
   };
 
-  const saveExperimental = async () => {
+  const saveExperimental = async (moveFolder = true) => {
+    if (guardRunning()) return;
     try {
       setState(await api.saveSettings({
         ...current().settings,
         folder_name: folderText().trim(),
         force_local_mise: forceMise(),
-      }));
+      }, moveFolder));
       setRequestError(null);
     } catch (error) {
+      setRequestError(toAppError(error));
+    }
+  };
+
+  // The switch persists on change, so an install started right after it keeps
+  // the choice; the folder name still needs its explicit Save.
+  const toggleForceMise = async (value: boolean) => {
+    setForceMise(value);
+    try {
+      setState(await api.saveSettings({ ...current().settings, force_local_mise: value }));
+      setRequestError(null);
+    } catch (error) {
+      setForceMise(current().settings.force_local_mise);
       setRequestError(toAppError(error));
     }
   };
@@ -278,70 +303,82 @@ export default function App() {
       <div class="titlebar-left" data-tauri-drag-region>
         <span class="wordmark" data-tauri-drag-region>Unsloth Studio Desktop</span>
         <div class="overflow">
-          <button class="info-button" title="Settings" aria-label="Settings" aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => { setPortText(String(current().settings.port)); setFolderText(current().settings.folder_name ?? ""); setForceMise(current().settings.force_local_mise ?? false); setMenuOpen(!menuOpen()); }}>
+          <button class="info-button" title="Settings" aria-label="Settings" aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => { setPortText(String(current().settings.port)); setFolderText(current().settings.folder_name ?? ""); setForceMise(current().settings.force_local_mise ?? false); setMenuTab("general"); setMenuOpen(!menuOpen()); }}>
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h11M2.5 10.5h11" /><circle cx="6" cy="5.5" r="1.6" /><circle cx="10" cy="10.5" r="1.6" /></svg>
           </button>
           <Show when={menuOpen()}>
             <div class="overflow-menu" role="menu">
-              <div class="overflow-row overflow-row-stack">
-                <div class="overflow-text">
-                  <span class="overflow-title">Install folder</span>
-                  <p>Choose where Unsloth Studio and its managed tools are installed. An existing installation in the selected folder is detected automatically; use Update to move it forward instead of reinstalling.</p>
-                  <p class="overflow-path">{current().settings.root}</p>
-                </div>
-                <div class="overflow-port">
-                  <button class="text-button menu-action" disabled={busy() || working()} onClick={() => { setMenuOpen(false); void changeRoot(); }}>
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.8 2.7 2.5 2.5M3 13l2.6-.5 7.8-7.8a1.8 1.8 0 0 0-2.5-2.5L3.1 10z" /></svg>
-                    <span>Change</span>
-                  </button>
-                </div>
+              <div class="overflow-tabs" role="tablist">
+                <button class={menuTab() === "general" ? "overflow-tab active" : "overflow-tab"} role="tab" aria-selected={menuTab() === "general"} onClick={() => setMenuTab("general")}>General</button>
+                <button class={menuTab() === "experimental" ? "overflow-tab active" : "overflow-tab"} role="tab" aria-selected={menuTab() === "experimental"} onClick={() => setMenuTab("experimental")}>Experimental</button>
               </div>
-              <div class="overflow-row overflow-row-stack">
-                <div class="overflow-text">
-                  <span class="overflow-title">Studio port</span>
-                  <p>Local port used by the Studio web interface. Change it only when another program already uses the current port.</p>
+              <Show when={menuTab() === "general"}>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Install folder</span>
+                    <p>Choose where Unsloth Studio and its managed tools are installed. An existing installation in the selected folder is detected automatically; use Update to move it forward instead of reinstalling.</p>
+                    <p class="overflow-path">{current().settings.root}</p>
+                  </div>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => { setMenuOpen(false); void changeRoot(); }}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.8 2.7 2.5 2.5M3 13l2.6-.5 7.8-7.8a1.8 1.8 0 0 0-2.5-2.5L3.1 10z" /></svg>
+                      <span>Change</span>
+                    </button>
+                  </div>
                 </div>
-                <div class="overflow-port">
-                  <input class="text-input" type="text" inputmode="numeric" value={portText()} onInput={event => setPortText(event.currentTarget.value)} />
-                  <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void commitPort()}>
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
-                    <span>Save</span>
-                  </button>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Studio port</span>
+                    <p>Local port used by the Studio web interface. Change it only when another program already uses the current port.</p>
+                  </div>
+                  <div class="overflow-port">
+                    <input class="text-input" type="text" inputmode="numeric" value={portText()} onInput={event => setPortText(event.currentTarget.value)} />
+                    <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void commitPort()}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
+                      <span>Save</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div class="overflow-row overflow-row-stack">
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Uninstall Studio</span>
+                    <p>Deletes the installed Studio, its virtual environment, and the managed mise tools from the install folder. Keeps mise.toml, user data, and the Hugging Face cache.</p>
+                  </div>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action overflow-danger" disabled={!removeEnabled() || busy()} onClick={() => { setMenuOpen(false); setRemoveText(""); setPanel("remove"); }}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2M6.6 6.9v3.9M9.4 6.9v3.9" /></svg>
+                      <span>Uninstall</span>
+                    </button>
+                  </div>
+                </div>
+              </Show>
+              <Show when={menuTab() === "experimental"}>
                 <div class="overflow-text">
-                  <span class="overflow-title">Experimental</span>
                   <p>Unstable options. Leave them off unless you know you need them.</p>
                 </div>
                 <label class="overflow-check">
-                  <input type="checkbox" checked={forceMise()} disabled={busy() || working()} onChange={event => setForceMise(event.currentTarget.checked)} />
+                  <input type="checkbox" role="switch" checked={forceMise()} disabled={busy() || working()} onChange={event => void toggleForceMise(event.currentTarget.checked)} />
+                  <span class="toggle" aria-hidden="true" />
                   <span>Always use a launcher-managed mise</span>
                 </label>
-                <div class="overflow-text">
-                  <p>Install folder name. Everything else stays in the same parent folder. Leave it empty to use the default name.</p>
-                  <p class="overflow-path">{current().settings.root}</p>
-                </div>
-                <div class="overflow-port">
-                  <input class="text-input" type="text" placeholder="Unsloth Studio Desktop" value={folderText()} disabled={busy() || working()} onInput={event => setFolderText(event.currentTarget.value)} />
-                  <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void saveExperimental()}>
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
-                    <span>Save</span>
+                <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Install folder name</span>
+                    <p>Renames the product folder inside its current parent folder. Leave it empty to use the default name.</p>
+                    <p class="overflow-path">{current().settings.root}</p>
+                  </div>
+                  <div class="overflow-port">
+                    <input class="text-input" type="text" placeholder="Unsloth Studio Desktop" value={folderText()} disabled={busy()} onInput={event => setFolderText(event.currentTarget.value)} />
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void saveExperimental()}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
+                      <span>Save</span>
+                    </button>
+                  </div>
+                  <button class="text-button folder-keep-link" disabled={busy()} onClick={() => { setMenuOpen(false); setPanel("keep"); }}>
+                    Keep the old folder and install somewhere else?
                   </button>
                 </div>
-              </div>
-              <div class="overflow-row overflow-row-stack">
-                <div class="overflow-text">
-                  <span class="overflow-title">Uninstall Studio</span>
-                  <p>Deletes the installed Studio, its virtual environment, and the managed mise tools from the install folder. Keeps mise.toml, user data, and the Hugging Face cache.</p>
-                </div>
-                <div class="overflow-port">
-                  <button class="text-button menu-action overflow-danger" disabled={!removeEnabled() || busy()} onClick={() => { setMenuOpen(false); setRemoveText(""); setPanel("remove"); }}>
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2M6.6 6.9v3.9M9.4 6.9v3.9" /></svg>
-                    <span>Uninstall</span>
-                  </button>
-                </div>
-              </div>
+              </Show>
             </div>
           </Show>
         </div>
@@ -416,7 +453,7 @@ export default function App() {
       </div>
       <div class="status-actions">
         <button class="root-path" title={current().settings.root} onClick={() => revealPath("root")}>{current().settings.root}</button>
-        <button class="text-button change-folder-button" disabled={busy() || working()} onClick={changeRoot}>
+        <button class="text-button change-folder-button" disabled={busy()} onClick={changeRoot}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.8 2.7 2.5 2.5M3 13l2.6-.5 7.8-7.8a1.8 1.8 0 0 0-2.5-2.5L3.1 10z" /></svg>
           <span>Change folder</span>
         </button>
@@ -447,6 +484,19 @@ export default function App() {
           <div class="inline-actions">
             <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => setPanel(null)}>Cancel</button>
             <button class="action-button button-primary" disabled={busy() || working()} onClick={confirmInstall}>{updating() ? "Update Studio" : "Install Studio"}</button>
+          </div>
+        </section>
+      </Show>
+
+      <Show when={panel() === "keep"}>
+        <section class="inline-panel">
+          <div>
+            <h2>Keep the old folder?</h2>
+            <p>The current folder stays untouched. The launcher switches to the new name, checks it for an installed Studio, and works with that folder from then on.</p>
+          </div>
+          <div class="inline-actions">
+            <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => setPanel(null)}>No</button>
+            <button class="action-button button-primary" disabled={busy() || working()} onClick={() => { setPanel(null); void saveExperimental(false); }}>Yes, keep old folder</button>
           </div>
         </section>
       </Show>

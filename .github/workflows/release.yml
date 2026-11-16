@@ -3,54 +3,117 @@ name: Release
 on:
   push:
     tags:
-      # Tag filters are globs, not regex; the CalVer format is enforced below.
-      - 'v*'
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: CalVer bump
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+        default: auto
 
 permissions:
   contents: write
 
+concurrency:
+  group: calver-release
+  cancel-in-progress: false
+
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    if: ${{ github.event_name == 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: windows-2022
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
         with:
-          toolchain: stable
+          ref: ${{ github.sha }}
+          fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 12
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: Prepare release version
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Setup MSVC build tools
-        uses: ilammy/msvc-dev-cmd@v1
+          $version = & ./scripts/calver.ps1 -Mode Prepare -Bump $env:BUMP
+          if (-not $version -or $version.Count -ne 1) {
+            throw 'CalVer preparation did not return exactly one version.'
+          }
 
-      - name: Build portable executable
+          git add -- Cargo.toml Cargo.lock
+          if ($LASTEXITCODE -ne 0) { throw "git add failed: $LASTEXITCODE" }
+
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Cargo files already contain CalVer $version."
+            exit 0
+          }
+          if ($LASTEXITCODE -ne 1) { throw "git diff failed: $LASTEXITCODE" }
+
+          git commit -m "chore(release): prepare $version"
+          if ($LASTEXITCODE -ne 0) { throw "git commit failed: $LASTEXITCODE" }
+
+          git push origin "HEAD:$env:DEFAULT_BRANCH"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not push the version commit. The default branch may have advanced; rerun this workflow after reviewing the branch.'
+          }
+
+      - name: Validate release version
+        id: validate-version
+        shell: pwsh
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref_name }}
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          if ($env:RELEASE_EVENT -eq 'push') {
+            $version = & ./scripts/calver.ps1 -Mode ValidateTag -Tag $env:RELEASE_REF
+          } else {
+            $version = & ./scripts/calver.ps1 -Mode ValidateNext -Bump $env:BUMP
+          }
+
+          if (-not $version -or $version.Count -ne 1) {
+            throw 'CalVer validation did not return exactly one version.'
+          }
+
+          "release_tag=v$version" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+          "release_commit=$(git rev-parse HEAD)" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+
+      - name: Verify native build prerequisites
+        shell: pwsh
+        run: |
+          # windows-2022 includes VS 2022 C++, full-framework MSBuild and this SDK.
+          $sdk = "${env:ProgramFiles(x86)}/Windows Kits/10/Include/10.0.26100.0"
+          if (-not (Test-Path "$sdk/um/Windows.h")) { throw 'Windows SDK 10.0.26100.0 is required.' }
+
+      - name: Build portable release binary
         shell: pwsh
         run: ./scripts/build-release.ps1
 
-      - name: Create GitHub release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
+      - name: Prepare release checksum
         shell: pwsh
         run: |
-          $version = $env:RELEASE_TAG
-          if ($version -notmatch '^v\d{4}\.\d{1,2}\.\d+$') {
-            throw "Invalid CalVer tag: $version"
-          }
-          gh release create $version dist/unsloth-studio-portable-windows-x64.exe `
-            --title $version `
-            --generate-notes
-          if ($LASTEXITCODE -ne 0) { throw "GitHub release creation failed with exit code $LASTEXITCODE" }
+          $name = 'unsloth-studio-portable-windows-x64.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 "dist/$name").Hash.ToLowerInvariant()
+          "$hash  $name" | Set-Content -Encoding ascii "dist/$name.sha256"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.validate-version.outputs.release_tag }}
+          target_commitish: ${{ steps.validate-version.outputs.release_commit }}
+          files: |
+            dist/unsloth-studio-portable-windows-x64.exe
+            dist/unsloth-studio-portable-windows-x64.exe.sha256
+          generate_release_notes: true
+          skip_if_release_exists: true

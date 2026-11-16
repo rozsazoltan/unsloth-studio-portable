@@ -174,7 +174,8 @@ export default function App() {
     try {
       const parent = await api.pickDirectory("root_parent");
       if (!parent) return;
-      const root = `${parent.replace(/[\\/]+$/, "")}\\Unsloth Studio Desktop`;
+      const folder = current().settings.folder_name?.trim() || "Unsloth Studio Desktop";
+      const root = `${parent.replace(/[\\/]+$/, "")}\\${folder}`;
       setState(await api.saveSettings({ ...current().settings, root }));
       setRequestError(null);
     } catch (error) {
@@ -214,6 +215,8 @@ export default function App() {
   const [portEditing, setPortEditing] = createSignal(false);
   const [portText, setPortText] = createSignal("");
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [folderText, setFolderText] = createSignal("");
+  const [forceMise, setForceMise] = createSignal(false);
   const editPort = () => {
     setPortText(String(current().settings.port));
     setPortEditing(true);
@@ -224,6 +227,19 @@ export default function App() {
     if (!Number.isInteger(port) || port < 1 || port > 65535 || port === current().settings.port) return;
     try {
       setState(await api.saveSettings({ ...current().settings, port }));
+      setRequestError(null);
+    } catch (error) {
+      setRequestError(toAppError(error));
+    }
+  };
+
+  const saveExperimental = async () => {
+    try {
+      setState(await api.saveSettings({
+        ...current().settings,
+        folder_name: folderText().trim(),
+        force_local_mise: forceMise(),
+      }));
       setRequestError(null);
     } catch (error) {
       setRequestError(toAppError(error));
@@ -262,7 +278,7 @@ export default function App() {
       <div class="titlebar-left" data-tauri-drag-region>
         <span class="wordmark" data-tauri-drag-region>Unsloth Studio Desktop</span>
         <div class="overflow">
-          <button class="info-button" title="Settings" aria-label="Settings" aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => { setPortText(String(current().settings.port)); setMenuOpen(!menuOpen()); }}>
+          <button class="info-button" title="Settings" aria-label="Settings" aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => { setPortText(String(current().settings.port)); setFolderText(current().settings.folder_name ?? ""); setForceMise(current().settings.force_local_mise ?? false); setMenuOpen(!menuOpen()); }}>
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h11M2.5 10.5h11" /><circle cx="6" cy="5.5" r="1.6" /><circle cx="10" cy="10.5" r="1.6" /></svg>
           </button>
           <Show when={menuOpen()}>
@@ -288,6 +304,27 @@ export default function App() {
                 <div class="overflow-port">
                   <input class="text-input" type="text" inputmode="numeric" value={portText()} onInput={event => setPortText(event.currentTarget.value)} />
                   <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void commitPort()}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
+                    <span>Save</span>
+                  </button>
+                </div>
+              </div>
+              <div class="overflow-row overflow-row-stack">
+                <div class="overflow-text">
+                  <span class="overflow-title">Experimental</span>
+                  <p>Unstable options. Leave them off unless you know you need them.</p>
+                </div>
+                <label class="overflow-check">
+                  <input type="checkbox" checked={forceMise()} disabled={busy() || working()} onChange={event => setForceMise(event.currentTarget.checked)} />
+                  <span>Always use a launcher-managed mise</span>
+                </label>
+                <div class="overflow-text">
+                  <p>Install folder name. Everything else stays in the same parent folder. Leave it empty to use the default name.</p>
+                  <p class="overflow-path">{current().settings.root}</p>
+                </div>
+                <div class="overflow-port">
+                  <input class="text-input" type="text" placeholder="Unsloth Studio Desktop" value={folderText()} disabled={busy() || working()} onInput={event => setFolderText(event.currentTarget.value)} />
+                  <button class="text-button menu-action" disabled={busy() || working()} onClick={() => void saveExperimental()}>
                     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h7l2 2v9h-9z" /><path d="M5.5 2.5v3.5h5V2.5M5.5 13v-3.5h5V13" /></svg>
                     <span>Save</span>
                   </button>

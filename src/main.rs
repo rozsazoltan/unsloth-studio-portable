@@ -15,11 +15,11 @@ struct CmdError {
 impl From<anyhow::Error> for CmdError {
     fn from(e: anyhow::Error) -> Self {
         let m = e.to_string();
-        let code = match m.as_str() {
+        let code = match m.split(':').next().unwrap_or_default() {
             "operation_in_progress"
             | "approval_required"
             | "confirm_required"
-            | "invalid_argument" => m.clone(),
+            | "invalid_argument" => m.split(':').next().unwrap_or_default().to_string(),
             _ => "internal".to_string(),
         };
         Self { code, message: m }
@@ -33,13 +33,14 @@ fn get_state(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn save_settings(settings: Settings, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+fn save_settings(mut settings: Settings, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
     if settings.root.trim().is_empty() || settings.hf_home.trim().is_empty() {
         return Err(CmdError {
             code: "invalid_argument".into(),
             message: "root and hugging face folder are required".into(),
         });
     }
+    settings.apply_folder_name()?;
     settings.save()?;
     let mut st = s.state.lock().unwrap();
     st.settings = settings;

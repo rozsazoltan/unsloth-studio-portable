@@ -73,7 +73,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .info-section a { color: #c7c7cb; text-decoration: underline; text-decoration-color: #55555a; text-underline-offset: 2px; }
 .info-section a:hover { color: var(--text); text-decoration-color: currentColor; }
 .overflow { position: relative; display: flex; }
-.overflow-menu { position: absolute; top: calc(100% + 8px); left: 0; right: auto; z-index: 9; display: flex; flex-direction: column; gap: 14px; width: min(340px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid #343438; border-radius: 8px; background: var(--panel); }
+.overflow-menu { position: absolute; top: calc(100% + 8px); left: 0; right: auto; z-index: 9; display: flex; flex-direction: column; gap: 14px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); overflow-y: auto; padding: 14px 16px; border: 1px solid #343438; border-radius: 8px; background: var(--panel); }
 .overflow-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .overflow-row + .overflow-row { padding-top: 14px; border-top: 1px solid var(--line); }
 .overflow-row-stack { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -82,6 +82,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .overflow-text p { margin: 0; color: var(--muted); font-size: var(--type-metadata); line-height: 1.5; }
 .overflow-path { overflow: hidden; color: var(--faint) !important; font: var(--type-micro) var(--mono) !important; text-overflow: ellipsis; white-space: nowrap; }
 .overflow-port { display: flex; align-items: center; gap: 6px; }
+.overflow-port .text-input { flex: 1; min-width: 0; }
+.overflow-check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: var(--type-metadata); cursor: pointer; }
+.overflow-check input { width: 13px; height: 13px; margin: 0; accent-color: #d4d4d8; cursor: pointer; }
 .overflow-danger { color: #bf8585; }
 .overflow-danger:hover:not(:disabled) { color: #d99a9a; }
 .menu-action { display: inline-flex; align-items: center; gap: 6px; padding-block: 0; line-height: 1; }

@@ -239,11 +239,13 @@ pub fn environment(c: &mut Command, s: &Settings) -> Result<()> {
     Ok(())
 }
 fn mise(settings: &Settings) -> Command {
-    if let Some(bin) = std::env::var_os("MISE_BIN") {
-        return Command::new(bin);
+    if !settings.force_local_mise {
+        if let Some(bin) = std::env::var_os("MISE_BIN") {
+            return Command::new(bin);
+        }
     }
     let local = PathBuf::from(&settings.root).join("runtime/bin/mise.exe");
-    if local.is_file() {
+    if local.is_file() || settings.force_local_mise {
         return Command::new(local);
     }
     Command::new("mise")
@@ -263,7 +265,7 @@ fn ensure_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
     if run(app, &mut probe, settings).is_ok() {
         return self_update_mise(app, settings);
     }
-    if std::env::var_os("MISE_BIN").is_some() {
+    if !settings.force_local_mise && std::env::var_os("MISE_BIN").is_some() {
         bail!("mise is not usable at MISE_BIN");
     }
     emit_log(
@@ -303,7 +305,9 @@ fn ensure_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
 /// Refresh only the launcher-managed copy. A mise already provided by the user
 /// is left alone, and failures are logged rather than aborting an install.
 fn self_update_mise(app: &AppHandle, settings: &Settings) -> Result<()> {
-    if std::env::var_os("MISE_BIN").is_some() || !local_mise(settings).is_file() {
+    if (!settings.force_local_mise && std::env::var_os("MISE_BIN").is_some())
+        || !local_mise(settings).is_file()
+    {
         return Ok(());
     }
     let mut update = mise(settings);

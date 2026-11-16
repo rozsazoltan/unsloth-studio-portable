@@ -1,5 +1,5 @@
 export type Phase = "absent" | "installing" | "installed" | "starting" | "running" | "stopping" | "removing" | "failed";
-export interface Settings { root: string; hf_home: string; port: number }
+export interface Settings { root: string; hf_home: string; port: number; folder_name: string; force_local_mise: boolean }
 export interface AppError { code: string; message: string }
 export interface State {
   phase: Phase;

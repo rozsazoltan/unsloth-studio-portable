@@ -27,6 +27,314 @@ impl From<anyhow::Error> for CmdError {
 }
 type CmdResult<T> = Result<T, CmdError>;
 
+/// Filename stamp in `yyyy-mm-dd-hhmmss` (UTC) without extra crates.
+fn timestamp_suffix() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs() as i64)
+        .unwrap_or(0);
+    let (year, month, day) = civil_from_days(secs.div_euclid(86_400));
+    let rem = secs.rem_euclid(86_400);
+    format!(
+        "{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}",
+        rem / 3600,
+        (rem % 3600) / 60,
+        rem % 60
+    )
+}
+
+/// Howard Hinnant's civil_from_days: days since the Unix epoch to a date.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    (
+        if month <= 2 { year + 1 } else { year },
+        month as u32,
+        day as u32,
+    )
+}
+
+fn studio_data_path(shared: &Shared) -> std::path::PathBuf {
+    std::path::Path::new(&shared.state.lock().unwrap().settings.root).join("app")
+}
+
+fn is_runtime_entry(name: &str) -> bool {
+    matches!(
+        name,
+        "unsloth_studio"
+            | "python"
+            | "uv"
+            | "source"
+            | "bin"
+            | "share"
+            | "llama.cpp"
+            | "whisper.cpp"
+            | "audio.cpp"
+    ) || name.starts_with(".venv_t5")
+}
+
+fn data_entries(root: &std::path::Path) -> anyhow::Result<Vec<std::ffi::OsString>> {
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    entries
+        .map(|entry| {
+            let entry = entry?;
+            Ok(
+                (!is_runtime_entry(&entry.file_name().to_string_lossy()))
+                    .then(|| entry.file_name()),
+            )
+        })
+        .filter_map(|entry| entry.transpose())
+        .collect()
+}
+
+fn remove_database_sidecars(root: &std::path::Path) -> anyhow::Result<()> {
+    fn visit(path: &std::path::Path) -> anyhow::Result<()> {
+        let metadata = match std::fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
+        if metadata.file_type().is_symlink() {
+            return Ok(());
+        } else if metadata.is_dir() {
+            let entries = match std::fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error.into()),
+            };
+            for entry in entries {
+                visit(&entry?.path())?;
+            }
+        } else if path.extension().is_some_and(|ext| ext == "db") {
+            for suffix in ["-wal", "-shm"] {
+                match std::fs::remove_file(path.with_file_name(format!(
+                    "{}{suffix}",
+                    path.file_name().unwrap().to_string_lossy()
+                ))) {
+                    Ok(()) => (),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+                    Err(error) => return Err(error.into()),
+                }
+            }
+        }
+        Ok(())
+    }
+    visit(root)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn backup_account(
+    _app: tauri::AppHandle,
+    s: tauri::State<'_, Arc<Shared>>,
+) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be backed up while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .set_file_name(format!(
+            "unsloth-studio-settings-{}.zip",
+            timestamp_suffix()
+        ))
+        .add_filter("Zip archive", &["zip"])
+        .save_file()
+    else {
+        return Ok(None);
+    };
+    let result = (|| -> anyhow::Result<()> {
+        let data = studio_data_path(&s);
+        anyhow::ensure!(
+            data.join("studio.db").is_file(),
+            "invalid_argument:The Studio data folder has no studio.db"
+        );
+        let file = std::fs::File::create(&path)?;
+        let mut archive = zip::ZipWriter::new(file);
+        fn add_path(
+            archive: &mut zip::ZipWriter<std::fs::File>,
+            root: &std::path::Path,
+            relative: &std::path::Path,
+        ) -> anyhow::Result<()> {
+            let source = root.join(relative);
+            let metadata = std::fs::symlink_metadata(&source)?;
+            anyhow::ensure!(
+                !metadata.file_type().is_symlink(),
+                "symbolic links are not supported in Studio data archives"
+            );
+            if metadata.is_dir() {
+                for entry in std::fs::read_dir(source)? {
+                    let entry = entry?;
+                    add_path(archive, root, &relative.join(entry.file_name()))?;
+                }
+            } else if metadata.is_file() {
+                let name = relative.to_string_lossy().replace('\\', "/");
+                archive.start_file(name, zip::write::SimpleFileOptions::default())?;
+                let mut file = std::fs::File::open(source)?;
+                std::io::copy(&mut file, archive)?;
+            }
+            Ok(())
+        }
+        for entry in data_entries(&data)? {
+            add_path(&mut archive, &data, std::path::Path::new(&entry))?;
+        }
+        archive.finish()?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        let _ = std::fs::remove_file(&path);
+        return Err(error.into());
+    }
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn restore_account(
+    _app: tauri::AppHandle,
+    s: tauri::State<'_, Arc<Shared>>,
+) -> CmdResult<Option<String>> {
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be restored while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    if matches!(
+        s.state.lock().unwrap().phase,
+        Phase::Starting | Phase::Running | Phase::Stopping
+    ) {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "stop Studio before restoring the data".into(),
+        });
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("Zip archive", &["zip"])
+        .add_filter("SQLite database", &["db"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+    let data = studio_data_path(&s);
+    if path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+    {
+        let file = std::fs::File::open(&path).map_err(anyhow::Error::from)?;
+        let mut archive = zip::ZipArchive::new(file).map_err(anyhow::Error::from)?;
+        let names = (0..archive.len())
+            .map(|index| archive.by_index(index).map(|entry| entry.name().to_owned()))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(anyhow::Error::from)?;
+        let first = names
+            .iter()
+            .filter_map(|name| name.split('/').next())
+            .next()
+            .unwrap_or_default();
+        let wrapped = !first.is_empty()
+            && names
+                .iter()
+                .all(|name| name.split('/').next() == Some(first))
+            && !names.iter().any(|name| name == "studio.db");
+        let strip = if wrapped {
+            format!("{first}/")
+        } else {
+            String::new()
+        };
+        if !names
+            .iter()
+            .any(|name| name.strip_prefix(&strip) == Some("studio.db"))
+        {
+            return Err(anyhow::anyhow!(
+                "invalid_argument:the archive does not look like a Studio data backup"
+            )
+            .into());
+        }
+        std::fs::create_dir_all(&data).map_err(anyhow::Error::from)?;
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).map_err(anyhow::Error::from)?;
+            if entry.is_dir() {
+                continue;
+            }
+            let name = entry.name().to_owned();
+            let relative = name.strip_prefix(&strip).unwrap_or(&name);
+            let components = relative.split('/').collect::<Vec<_>>();
+            if relative.starts_with('/')
+                || relative.starts_with('\\')
+                || relative.as_bytes().get(1).is_some_and(|byte| *byte == b':')
+                || components
+                    .iter()
+                    .any(|part| part.is_empty() || *part == "..")
+            {
+                return Err(anyhow::anyhow!("invalid_argument:unsafe archive path").into());
+            }
+            let destination = components
+                .iter()
+                .fold(data.clone(), |path, part| path.join(part));
+            std::fs::create_dir_all(destination.parent().unwrap()).map_err(anyhow::Error::from)?;
+            let mut output = std::fs::File::create(destination).map_err(anyhow::Error::from)?;
+            std::io::copy(&mut entry, &mut output).map_err(anyhow::Error::from)?;
+        }
+        remove_database_sidecars(&data)?;
+    } else {
+        let target = data.join("auth/auth.db");
+        std::fs::create_dir_all(target.parent().unwrap()).map_err(anyhow::Error::from)?;
+        std::fs::copy(&path, &target).map_err(anyhow::Error::from)?;
+        for suffix in ["-wal", "-shm"] {
+            match std::fs::remove_file(target.with_file_name(format!("auth.db{suffix}"))) {
+                Ok(()) => (),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+                Err(error) => return Err(anyhow::Error::from(error).into()),
+            }
+        }
+    }
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn delete_account(confirm: String, s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
+    if confirm != "REMOVE" {
+        return Err(CmdError {
+            code: "confirm_required".into(),
+            message: "type REMOVE to confirm".into(),
+        });
+    }
+    if s.operation.lock().unwrap().is_some() {
+        return Err(CmdError { code: "operation_in_progress".into(), message: "The account cannot be deleted while an operation is running. Wait for it to finish and try again.".into() });
+    }
+    if matches!(
+        s.state.lock().unwrap().phase,
+        Phase::Starting | Phase::Running | Phase::Stopping
+    ) {
+        return Err(CmdError {
+            code: "invalid_argument".into(),
+            message: "stop Studio before deleting the account".into(),
+        });
+    }
+    let data = studio_data_path(&s);
+    for entry in data_entries(&data)? {
+        let path = data.join(entry);
+        let result = if std::fs::symlink_metadata(&path)
+            .is_ok_and(|metadata| metadata.file_type().is_dir())
+        {
+            std::fs::remove_dir_all(path)
+        } else {
+            std::fs::remove_file(path)
+        };
+        match result {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(anyhow::Error::from(error).into()),
+        }
+    }
+    Ok(s.state.lock().unwrap().clone())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn get_state(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<State> {
     Ok(s.state.lock().unwrap().clone())
@@ -159,7 +467,7 @@ fn export_settings(s: tauri::State<'_, Arc<Shared>>) -> CmdResult<Option<String>
         });
     }
     let Some(path) = rfd::FileDialog::new()
-        .set_file_name("launcher-settings.json")
+        .set_file_name(format!("launcher-settings-{}.json", timestamp_suffix()))
         .add_filter("JSON", &["json"])
         .save_file()
     else {
@@ -386,6 +694,9 @@ fn main() {
             migrate_settings,
             export_settings,
             import_settings,
+            backup_account,
+            restore_account,
+            delete_account,
             pick_directory,
             install,
             cancel_install,

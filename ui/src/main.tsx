@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 import { api, previewPhases, previewFailedState, previewHfLockedState, previewInstallingState, previewStartingState, previewState, type AppError, type Phase, type Settings, type State } from "./bridge";
 import { previewLogs } from "./mock";
 
-type InlinePanel = "install" | "remove" | "keep" | null;
+type InlinePanel = "install" | "remove" | "keep" | "account" | null;
 const mockMode = () => import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
 const workingPhases: Phase[] = ["installing", "starting", "stopping", "removing"];
 
@@ -323,6 +323,16 @@ export default function App() {
     setPanel(null);
     perform(() => api.remove(removeText()));
   };
+  const confirmDeleteAccount = () => {
+    setPanel(null);
+    perform(() => api.deleteAccount("REMOVE"));
+  };
+  const accountAction = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    try { const path = await action(); if (path) setRequestError(null); }
+    catch (error) { setRequestError(toAppError(error)); }
+    finally { setBusy(false); }
+  };
 
   const installEnabled = () => !working() && (phase() === "absent" || phase() === "failed" || phase() === "installed");
   const updating = () => phase() === "installed";
@@ -356,6 +366,7 @@ export default function App() {
                 <button class={menuTab() === "experimental" ? "overflow-tab active" : "overflow-tab"} role="tab" aria-selected={menuTab() === "experimental"} onClick={() => setMenuTab("experimental")}>Experimental</button>
               </div>
               <Show when={menuTab() === "general"}>
+                <div class="general-settings">
                 <div class="overflow-row overflow-row-stack">
                   <div class="overflow-text">
                     <span class="overflow-title">Install folder</span>
@@ -370,6 +381,23 @@ export default function App() {
                   </div>
                 </div>
                 <div class="overflow-row overflow-row-stack">
+                  <div class="overflow-text">
+                    <span class="overflow-title">Studio config</span>
+                    <p>Back up config saves the whole Studio data folder. Restore config brings that state back; stop Studio first. Delete config resets Studio to a fresh state. The launcher’s launcher-settings.json is not included.</p>
+                  </div>
+                  <div class="overflow-port">
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.backupAccount)}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 10v3h10v-3" /></svg><span>Back up config</span>
+                    </button>
+                    <button class="text-button menu-action" disabled={busy()} onClick={() => void accountAction(api.restoreAccount)}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 10V2m-3 3 3-3 3 3M3 9v4h10V9" /></svg><span>Restore config</span>
+                    </button>
+                    <button class="text-button menu-action overflow-danger" disabled={busy()} onClick={() => { setMenuOpen(false); setRemoveText(""); setPanel("account"); }}>
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.8 4.2h10.4M6 4.2V2.6h4v1.6M4.2 4.2l.7 9.2h6.2l.7-9.2" /></svg><span>Delete config</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="overflow-row overflow-row-stack settings-menu-wide">
                   <div class="overflow-text">
                     <span class="overflow-title">Settings file</span>
                     <p>This file stores your chosen install folder and options. It lives in the install folder; a small pointer next to the executable records which folder is active.</p>
@@ -441,8 +469,10 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+                </div>
               </Show>
               <Show when={menuTab() === "experimental"}>
+                <div class="experimental-settings">
                 <div class="overflow-text">
                   <p>Unstable options. Leave them off unless you know you need them.</p>
                 </div>
@@ -469,6 +499,7 @@ export default function App() {
                     <span>Keep the old folder and install somewhere else?</span>
                   </button>
                 </div>
+                </div>
               </Show>
             </div>
           </Show>
@@ -493,6 +524,22 @@ export default function App() {
             <option value="hf-locked">HF folder locked</option>
           </select>
         </label>
+      </Show>
+
+      <Show when={panel() === "account"}>
+        <section class="inline-panel remove-panel">
+          <div>
+            <h2>Delete the Studio config?</h2>
+            <p>Delete config resets Studio to a fresh state by deleting the whole Studio data folder. Stop Studio first. Restore config brings a saved state back. The launcher’s launcher-settings.json is not included.</p>
+          </div>
+          <label class="confirm-field">Type REMOVE to confirm
+            <input value={removeText()} onInput={event => setRemoveText(event.currentTarget.value)} autocomplete="off" />
+          </label>
+          <div class="inline-actions">
+            <button class="action-button button-secondary" disabled={busy() || working()} onClick={() => setPanel(null)}>Cancel</button>
+            <button class="action-button button-danger" disabled={busy() || working() || removeText() !== "REMOVE"} onClick={confirmDeleteAccount}>Delete config</button>
+          </div>
+        </section>
       </Show>
     <Show when={infoOpen()}>
       <div class="info-backdrop" onClick={closeInfo}>

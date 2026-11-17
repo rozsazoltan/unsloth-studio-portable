@@ -14,6 +14,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 rfd = "0.15"
 url = "2"
 tauri-plugin-opener = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

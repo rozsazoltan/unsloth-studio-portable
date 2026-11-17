@@ -1,3 +1,6 @@
+> [!WARNING]
+> This project is archived. The approach lives on, generalized, in [verzly/autark-marketplace](https://github.com/verzly/autark-marketplace), which provides the same portable, marketplace-driven install model for any app.
+
 # Unsloth Studio Desktop
 
 Portable Windows launcher and manager for Unsloth Studio. It manages dependencies through [mise-en-place](https://github.com/jdx/mise).
